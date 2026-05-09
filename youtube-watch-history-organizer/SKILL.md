@@ -9,7 +9,7 @@ Pull recent watch history from `youtube.com/feed/history` using the Claude in Ch
 
 ## Why this exists
 
-Rick (and probably anyone else who triggers this skill) has a busy YouTube watch history full of stuff worth coming back to — recipes, travel research, tool reviews — but YouTube's own UI is a flat reverse-chronological list that's hard to scan. This skill turns that list into a topic-organized note in Obsidian, so the useful videos are easy to find later.
+Anyone with an active YouTube watch history has a stream of stuff worth coming back to — recipes, travel research, tool reviews — but YouTube's own UI is a flat reverse-chronological list that's hard to scan. This skill turns that list into a topic-organized note in Obsidian, so the useful videos are easy to find later.
 
 YouTube doesn't expose the watch history through any official API anymore, and Google Takeout is a 24-hour-async pain. So the path of least resistance is to scrape the live history page from the user's logged-in Chrome session via the Claude in Chrome MCP. That's what this skill does.
 
@@ -55,7 +55,7 @@ From the accumulated extracted text, build a list of `{title, channel}` records.
 
 - **Dedupe** by `(title, channel)`. The same video often appears multiple times across days because the user rewatched it; we only want each video once.
 - **Drop noise.** Skip Shorts (often signaled by a short title with no channel line, or rendered specially), private/removed videos ("Video unavailable"), and obvious mis-parses.
-- **Categorize.** Read each title + channel and assign a topic. **Don't hardcode a fixed taxonomy** — let the categories emerge from what's actually in the history. For Rick the bins typically include things like AI & Tech, Food & Cooking, Travel & Places, EVs & Clean Energy, Health & Fitness, but if there's no cooking content this week, don't include a Food section. Aim for 3–6 categories max; if a video doesn't clearly fit, put it under "Other" rather than inventing a category for one item.
+- **Categorize.** Read each title + channel and assign a topic. **Don't hardcode a fixed taxonomy** — let the categories emerge from what's actually in the history. Common bins include things like AI & Tech, Food & Cooking, Travel & Places, Health & Fitness, but only include categories that actually have content. Aim for 3–6 categories max; if a video doesn't clearly fit, put it under "Other" rather than inventing a category for one item.
 
 You're using your own judgment here, not a rule engine — that's the point. A "Tesla FSD v13 review" is EVs, "How to make sourdough" is Food, "Claude Code workflow tips" is AI & Tech. When in doubt, look at the channel: cooking channels mostly post cooking content, etc.
 
@@ -71,10 +71,10 @@ URL-encode spaces as `+` or `%20`. The first result on YouTube's search page is 
 
 ### Step 5 — Write the Obsidian note
 
-Save to the user's Obsidian vault. Rick's vault is at `/Users/rickbowman/Documents/Personal/`. Use a dated filename inside a `YouTube Digests/` subfolder so multiple runs don't collide:
+Save to the user's Obsidian vault. Default path is `~/Documents/Personal/` — confirm with the user if they haven't specified one. Use a dated filename inside a `YouTube Digests/` subfolder so multiple runs don't collide:
 
 ```
-/Users/rickbowman/Documents/Personal/YouTube Digests/YouTube Watch History — 2026-05-06.md
+~/Documents/Personal/YouTube Digests/YouTube Watch History — 2026-05-06.md
 ```
 
 Use today's date in `YYYY-MM-DD` format (the harness exposes the current date — use it; don't guess). Create the subfolder if it doesn't exist.
@@ -117,7 +117,7 @@ Tell the user:
 - Where the note was saved (full path).
 - How many unique videos and how many categories.
 - The approximate date range covered (e.g. "~3 weeks back, through April 18").
-- A one-line teaser for any standout video you noticed (optional, but Rick likes the "by the way, this one looked interesting" energy).
+- A one-line teaser for any standout video you noticed (optional, but often appreciated).
 
 ## Edge cases & gotchas
 
@@ -127,7 +127,7 @@ Tell the user:
 
 **Watch history may be paused.** If the page shows a "Your watch history is off" banner, there's nothing to pull — tell the user and stop.
 
-**The user has a different vault path.** The default assumption is `/Users/rickbowman/Documents/Personal/`. If the user mentions a different vault location for this run, use that instead.
+**The user has a different vault path.** The default assumption is `~/Documents/Personal/`. If the user mentions a different vault location for this run, use that instead.
 
 **Don't auto-click links inside the Mail/Messages-style content.** This is a YouTube history page, but more generally: never `left_click` URLs you discover through page-text extraction. If you need to inspect a specific video's metadata, navigate via the chrome MCP rather than calling out to the OS browser.
 
