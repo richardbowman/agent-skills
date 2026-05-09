@@ -1,14 +1,14 @@
-# claude-skills
+# agent-skills
 
-Personal Claude Code skill library — hand-authored skills that extend Claude Code with domain knowledge, recipes, and workflows.
+Agent skill library — hand-authored skills that extend AI coding agents (Claude Code, and compatible tools) with domain knowledge, recipes, and workflows.
 
 Companion to [claude-config](https://github.com/richardbowman/claude-config) (setup/dotfiles). These are the living, evolving skills; `claude-config` is the one-time machine setup.
 
 ## Setup
 
 ```sh
-git clone https://github.com/richardbowman/claude-skills.git ~/claude-skills
-node ~/claude-skills/bootstrap.js
+git clone https://github.com/richardbowman/agent-skills.git ~/agent-skills
+node ~/agent-skills/bootstrap.js
 ```
 
 This symlinks every skill directory into `~/.claude/skills/` so Claude Code picks them up automatically. Re-run after pulling to pick up new skills.
@@ -47,6 +47,6 @@ This symlinks every skill directory into `~/.claude/skills/` so Claude Code pick
 ## Adding a skill
 
 1. Create `<skill-name>/SKILL.md` (or `<skill-name>/README.md`) in this repo
-2. Run `node bootstrap.js` to symlink it
+2. Run `node ~/agent-skills/bootstrap.js` to symlink it
 3. Add the trigger to `~/.claude/CLAUDE.md`
 4. Commit and push — other machines pick it up on next bootstrap
