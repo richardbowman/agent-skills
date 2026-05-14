@@ -13,6 +13,20 @@ Scaffolds a complete Aurora DSQL + Prisma 7 integration for Next.js projects on 
 - Starting a new Next.js project that needs serverless Postgres on Vercel
 - Migrating an existing project from traditional Postgres to DSQL
 
+## Starting from the official starter
+
+The fastest path is cloning the starter repo directly:
+
+```bash
+npx create-next-app --example https://github.com/bankrate-prototypes/v0-prisma-dsql-starter my-app
+```
+
+Then customize `PGSCHEMA` in your Vercel environment variables (see Step 4 below).
+
+The starter includes the full guide at `/guide` and all files described below.
+
+---
+
 ## What it creates
 
 ### 1. Package dependencies
@@ -44,7 +58,6 @@ Add to `package.json`:
 At project root:
 
 ```typescript
-// prisma.config.ts
 import { defineConfig } from "prisma/config";
 
 // The URL here is ONLY used by Prisma CLI tooling (prisma migrate diff /
@@ -90,36 +103,43 @@ model Todo {
 
 ### 4. `lib/schema.ts`
 
-Environment-based schema resolver:
+Schema name is always `{prefix}_{env}`. Set `PGSCHEMA` in Vercel to customize the prefix;
+defaults to `app` if not set.
 
 ```typescript
-// lib/schema.ts
 /**
  * Returns the active PostgreSQL schema name for the current environment.
- * Each environment gets its own isolated schema on the shared Aurora DSQL cluster.
  *
- * VERCEL_ENV is set automatically by Vercel in preview and production.
- * NODE_ENV=development covers local dev and the v0 sandbox.
+ * The schema name is always "{prefix}_{suffix}" where:
+ *   - prefix: PGSCHEMA env var if set, otherwise "app"
+ *   - suffix: derived from the current environment
+ *       NODE_ENV=development  → "dev"
+ *       VERCEL_ENV=preview    → "preview"
+ *       VERCEL_ENV=production → "prod"
+ *
+ * Examples with PGSCHEMA=myapp: myapp_dev, myapp_preview, myapp_prod
+ * Examples without PGSCHEMA:       app_dev,    app_preview,    app_prod
+ *
  * Schema names must use underscores, not dashes (PostgreSQL constraint).
- * Do NOT set a PGSCHEMA environment variable — it overrides this logic.
  */
 export function getActiveSchema(): string {
-  if (process.env.NODE_ENV === "development") return "myapp_dev";
+  const prefix = process.env.PGSCHEMA ?? "app";
+
+  if (process.env.NODE_ENV === "development") return `${prefix}_dev`;
+
   const vercelEnv = process.env.VERCEL_ENV;
-  if (vercelEnv === "preview")    return "myapp_preview";
-  if (vercelEnv === "production") return "myapp_prod";
-  return "myapp_dev"; // safe fallback
+  if (vercelEnv === "preview") return `${prefix}_preview`;
+  if (vercelEnv === "production") return `${prefix}_prod`;
+
+  return `${prefix}_dev`;
 }
 ```
-
-**Replace `myapp` with the actual project name** (use underscores, not dashes).
 
 ### 5. `lib/db.ts`
 
 Prisma client with DSQL adapter and schema isolation:
 
 ```typescript
-// lib/db.ts
 import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
@@ -191,7 +211,6 @@ export default function getPrisma(): Promise<PrismaClient> {
 Migration runner API route:
 
 ```typescript
-// app/api/admin/migrate/route.ts
 import { NextResponse } from "next/server";
 import { readFileSync } from "fs";
 import path from "path";
@@ -238,8 +257,6 @@ export async function POST(req: Request) {
     if (applied.has(name)) {
       return NextResponse.json({ success: true, message: "Already applied." });
     }
-    // search_path was set inside bootstrapAndGetApplied — unqualified table names
-    // in the generated SQL will now resolve into the active schema, not public.
     await client.query(sql);
     await client.query("BEGIN");
     await client.query(
@@ -294,7 +311,6 @@ function buildPool() {
 ### 7. Example API route
 
 ```typescript
-// app/api/todos/route.ts
 import { NextResponse } from "next/server";
 import getPrisma from "@/lib/db";
 
@@ -318,11 +334,12 @@ export async function POST(req: Request) {
 
 1. **Install dependencies**: `pnpm install` (runs `postinstall` automatically)
 2. **Install Vercel DSQL integration** in project settings → Integrations → Aurora DSQL
-3. **Deploy to Vercel** — environment variables are injected automatically
-4. **Run migrations** for each environment:
-   - Development: `curl -X POST https://your-dev-url.vercel.app/api/admin/migrate -d '{"name":"001_init"}'`
-   - Preview: `curl -X POST https://your-preview-url.vercel.app/api/admin/migrate -d '{"name":"001_init"}'`
-   - Production: `curl -X POST https://your-production-url.vercel.app/api/admin/migrate -d '{"name":"001_init"}'`
+3. **(Optional) Set `PGSCHEMA`** in Vercel environment variables to a custom prefix (e.g. `myapp`). If not set, defaults to `app`.
+4. **Deploy to Vercel** — environment variables are injected automatically
+5. **Run migrations** for each environment via the `/admin` panel or:
+   ```bash
+   curl -X POST https://your-url.vercel.app/api/admin/migrate -H "Content-Type: application/json" -d '{"name":"001_init"}'
+   ```
 
 ## Critical constraints
 
@@ -331,12 +348,10 @@ export async function POST(req: Request) {
 - **No foreign keys** — use `relationMode = "prisma"`
 - **No synchronous indexes** — `aurora-dsql-prisma migrate` adds `ASYNC` automatically
 - **One DDL per transaction** — the migration tool handles this
-- **`options: --search_path` ignored** — use `PrismaPg(pool, { schema })` instead
-
-## Local development fallback
-
-For local dev without DSQL, use the `worktree-bootstrap` skill pattern — check for `DATABASE_URL` in `prisma.config.ts` and short-circuit to a local Postgres connection instead of the DSQL adapter.
+- **`options: --search_path` ignored by DSQL** — use `PrismaPg(pool, { schema })` instead
 
 ## Reference
 
-Full guide at: `/Users/rbowman/Downloads/prisma-dsql-guide (8).md`
+- Starter repo: https://github.com/bankrate-prototypes/v0-prisma-dsql-starter
+- Full guide: `/guide` route on any deployment, or download the MDX via `/api/guide`
+- Raw guide source: https://github.com/bankrate-prototypes/v0-prisma-dsql-starter/blob/main/features/guide/guide-content.mdx

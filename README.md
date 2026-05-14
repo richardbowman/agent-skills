@@ -7,13 +7,13 @@ Companion to [claude-config](https://github.com/richardbowman/claude-config) (se
 ## Setup
 
 ```sh
-git clone https://github.com/richardbowman/agent-skills.git ~/agent-skills
-node ~/agent-skills/bootstrap.js
+git clone https://github.com/richardbowman/agent-skills.git ~/Projects/agent-skills   # or ~/GitHub, ~/code, etc.
+node ~/Projects/agent-skills/bootstrap.js
 ```
 
 This symlinks every skill directory into `~/.claude/skills/` so Claude Code picks them up automatically. Re-run after pulling to pick up new skills.
 
-> **Note:** `claude-config`'s bootstrap clones this repo and runs `bootstrap.js` automatically — you only need the above command for standalone setup.
+> **Note:** `claude-config`'s bootstrap clones this repo as a sibling directory and runs `bootstrap.js` automatically — you only need the above command for standalone setup.
 
 ## Skills
 
@@ -47,6 +47,6 @@ This symlinks every skill directory into `~/.claude/skills/` so Claude Code pick
 ## Adding a skill
 
 1. Create `<skill-name>/SKILL.md` (or `<skill-name>/README.md`) in this repo
-2. Run `node ~/agent-skills/bootstrap.js` to symlink it
+2. Run `node <projects-dir>/agent-skills/bootstrap.js` to symlink it
 3. Add the trigger to `~/.claude/CLAUDE.md`
 4. Commit and push — other machines pick it up on next bootstrap

@@ -5,7 +5,7 @@ description: Memory consolidation + friction mining for Claude Code. Scans recen
 
 # Dream — Memory Consolidation & Friction Mining
 
-Modeled on Anthropic's unreleased auto-dream feature, extended with a friction-mining phase that mines conversation logs for moments where Rick expressed frustration, corrected a mistake, or stated a preference — then turns those signals into new `feedback_*.md` memory files.
+Modeled on Anthropic's unreleased auto-dream feature, extended with a friction-mining phase that mines conversation logs for moments where the user expressed frustration, corrected a mistake, or stated a preference — then turns those signals into new `feedback_*.md` memory files.
 
 **Run time:** ~2-4 minutes. Run all phases in order, never skip.
 
@@ -16,8 +16,7 @@ Modeled on Anthropic's unreleased auto-dream feature, extended with a friction-m
 | Path | Purpose |
 |---|---|
 | `~/.claude/dream-last-run` | ISO-8601 UTC timestamp of last completed dream |
-| `~/.claude/projects/-Users-rickbowman-projects-golden-wealth-app/memory/` | Golden Wealth project memory |
-| `~/.claude/projects/-Users-rickbowman/memory/` | Global (cross-project) memory |
+| `~/.claude/projects/<project-slug>/memory/` | Per-project memory (feedback rules, project context) |
 
 ---
 
@@ -33,14 +32,11 @@ echo "Last dream: $LAST_RUN"
 # Count conversation files
 find ~/.claude/projects -name "*.jsonl" | wc -l
 
-# List existing feedback files
-echo "=== GW project feedback ===" && ls ~/.claude/projects/-Users-rickbowman-projects-golden-wealth-app/memory/feedback_*.md 2>/dev/null
-echo "=== Global feedback ===" && ls ~/.claude/projects/-Users-rickbowman/memory/feedback_*.md 2>/dev/null
+# List existing feedback files across all project memory dirs
+find ~/.claude/projects -path "*/memory/feedback_*.md" 2>/dev/null
 ```
 
-Read all existing MEMORY.md files so you know what's already captured:
-- `~/.claude/projects/-Users-rickbowman-projects-golden-wealth-app/memory/MEMORY.md`
-- `~/.claude/projects/-Users-rickbowman/memory/MEMORY.md`
+Read all existing `MEMORY.md` files and `feedback_*.md` files so you know what's already captured before writing anything new.
 
 ---
 
@@ -112,10 +108,8 @@ for path in sorted(glob.glob(f"{LOGS_DIR}/**/*.jsonl", recursive=True)):
             continue
         files_scanned += 1
 
-        # Extract project slug from path
         rel = path.replace(LOGS_DIR + "/", "")
         project = rel.split("/")[0]
-        session_file = rel.split("/")[-1].replace(".jsonl", "")[:8]
 
         with open(path) as f:
             lines = f.readlines()
@@ -218,24 +212,24 @@ PYEOF
 
 ## Phase 3: PATTERN ANALYSIS
 
-After reading the friction and praise output, do this reasoning step **before** writing any files:
+After reading the friction and praise output, reason through it **before** writing any files:
 
 ### 3a. Cross-reference against existing feedback
 
-For each friction signal, check: does this match a rule already captured in `feedback_*.md`?
+For each friction signal, check: does this match a rule already in `feedback_*.md`?
 
-- **If yes → reinforcement.** The rule exists but Claude violated it. Note which existing file covers it. Don't create a duplicate.
+- **If yes → reinforcement.** Rule exists but was still violated. Note which file. Don't create a duplicate.
 - **If no → new signal.** Candidate for a new feedback file.
 
 ### 3b. Quality filter
 
 Discard signals that are:
-- One-off or ambiguous ("no," followed by user correcting their own prompt)
+- One-off or ambiguous (user correcting their own prompt)
 - Too vague to produce an actionable rule
-- Already well-covered by existing CLAUDE.md global instructions
+- Already well-covered by existing CLAUDE.md instructions
 
 Keep signals that are:
-- **Explicit rule declarations** ("from now on", "always", "never") — always keep these
+- **Explicit rule declarations** ("from now on", "always", "never") — always keep
 - **Repeated** across multiple sessions — strong signal
 - **Specific enough** to write a clear How-to-apply
 
@@ -244,14 +238,9 @@ Keep signals that are:
 For each keeper, draft:
 - **Slug** — snake_case, e.g. `feedback_dont_ask_before_running_scripts`
 - **Name** — short title
-- **Description** — one sentence
 - **Rule** — the actionable statement
-- **Why** — what Rick said / what pattern showed it
+- **Why** — what the user said / what the pattern showed
 - **How to apply** — specific, concrete
-
-### 3d. Identify praise patterns
-
-Praise signals tell you what's working — don't accidentally regress those behaviors. Note them in the Obsidian report but don't create feedback files for praise.
 
 ---
 
@@ -259,57 +248,54 @@ Praise signals tell you what's working — don't accidentally regress those beha
 
 ### 4a. Create new feedback files
 
-For each new feedback rule, write a file to the appropriate memory dir.
+Write to the appropriate project memory dir: `~/.claude/projects/<project-slug>/memory/feedback_<slug>.md`
 
-Use **GW project memory** (`~/.claude/projects/-Users-rickbowman-projects-golden-wealth-app/memory/`) for rules specific to that codebase (Vercel, DSQL, migrations, worktrees).
+For cross-project rules (communication style, tool habits), use the global project dir: `~/.claude/projects/-Users-<username>/memory/`
 
-Use **global memory** (`~/.claude/projects/-Users-rickbowman/memory/`) for rules that apply everywhere (communication style, workflow habits, tool usage patterns).
-
-Format — must match existing files exactly:
+Use this exact format:
 
 ```markdown
 ---
 name: <Short title, title case>
-description: <One sentence describing the rule>
+description: <One sentence>
 type: feedback
 ---
 
 <The rule, plainly stated in 1-3 sentences.>
 
-**Why:** <Direct quote or paraphrase of what Rick said, or description of the pattern found. Include date if possible.>
+**Why:** <Direct quote or paraphrase. Include date if possible.>
 
-**How to apply:** <Specific, actionable guidance. Tell Claude exactly what to do differently.>
+**How to apply:** <Specific, actionable guidance.>
 ```
 
 ### 4b. Reinforce violated rules
 
-For each **existing** rule that was still being violated, append to the bottom of that file:
+For existing rules still being violated, append to the bottom of that file:
 
 ```markdown
-**Reinforced:** YYYY-MM-DD — still occurring. Example: "<brief quote from signal>"
+**Reinforced:** YYYY-MM-DD — still occurring. Example: "<brief quote>"
 ```
 
-### 4c. Update MEMORY.md index
+### 4c. Update MEMORY.md
 
-For each new file, add a line to the appropriate `MEMORY.md`:
-
+Add a line for each new file:
 ```
 - [<Name>](feedback_<slug>.md) — <one-line summary>
 ```
 
-Keep MEMORY.md under 200 lines. If it grows beyond that, archive entries older than 90 days to `memory/archive/YYYY-MM.md`.
+Keep MEMORY.md under 200 lines. Archive entries older than 90 days to `memory/archive/YYYY-MM.md` if needed.
 
-### 4d. Memory consolidation (standard)
+### 4d. Memory consolidation
 
-- Remove any entries from MEMORY.md that reference deleted or missing files
-- Resolve contradictions: newer entry wins, move old one to `memory/archive/`
-- Convert any relative dates to absolute YYYY-MM-DD in all memory files
+- Remove any MEMORY.md entries pointing to missing files
+- Resolve contradictions: newer entry wins, old one moves to `memory/archive/`
+- Replace any relative dates with absolute YYYY-MM-DD
 
 ---
 
 ## Phase 5: OBSIDIAN REPORT
 
-Write a dream session note to the vault.
+If the user has an Obsidian vault, write a dated report. Check for a vault at `~/Documents/Personal/` or skip this phase if none exists.
 
 ```bash
 DATE=$(date +%Y-%m-%d)
@@ -317,49 +303,34 @@ DATE=$(date +%Y-%m-%d)
 
 Write to: `~/Documents/Personal/Claude/dream-${DATE}.md`
 
-Structure:
-
 ```markdown
 # Dream Session — YYYY-MM-DD
 
 ## Summary
 - Scanned N files across N projects
 - Found N friction signals, N praise signals
-- Created N new feedback rules (list them)
-- Reinforced N existing rules (list them)
-- Memory consolidation: removed N stale entries, resolved N contradictions
+- Created N new feedback rules
+- Reinforced N existing rules
 
 ## New Feedback Rules Created
-<!-- For each new file: - `feedback_slug.md` — what it captures -->
-
 ## Existing Rules Reinforced
-<!-- Rules that are still being violated — these need extra attention -->
-
 ## Praise Patterns — Don't Regress These
-<!-- What's working well -->
-
 ## Friction Signal Log
-<!-- Full list of friction hits for audit, grouped by project -->
-
 ## Insights
-<!-- Anything that stood out — patterns across projects, systemic issues, etc. -->
 ```
 
-After writing, add a wikilink to today's daily note at `~/Documents/Personal/Daily/${DATE}.md` under `## Claude Sessions`. Create the section if it doesn't exist.
+Add a wikilink in today's daily note at `~/Documents/Personal/Daily/${DATE}.md` under `## Claude Sessions`.
 
-Open the report in Obsidian:
-
+Open in Obsidian:
 ```bash
 DATE=$(date +%Y-%m-%d)
-ENCODED_DATE=$(python3 -c "import urllib.parse; print(urllib.parse.quote('Claude/dream-${DATE}'))")
-open "obsidian://open?vault=Personal&file=${ENCODED_DATE}"
+ENCODED=$(python3 -c "import urllib.parse; print(urllib.parse.quote('Claude/dream-${DATE}'))")
+open "obsidian://open?vault=Personal&file=${ENCODED}"
 ```
 
 ---
 
 ## Phase 6: STAMP
-
-Mark completion:
 
 ```bash
 date -u +%Y-%m-%dT%H:%M:%SZ > ~/.claude/dream-last-run
@@ -371,15 +342,14 @@ echo "Dream complete. Next run in ~24h."
 ## Tips for signal quality
 
 **High-value friction signals:**
-- "From now on..." / "Always..." / "Never..." — user is explicitly encoding a rule
+- "From now on..." / "Always..." / "Never..." — user explicitly encoding a rule
 - Same mistake appearing across multiple sessions (different session IDs, same pattern)
-- User had to re-explain something they already said in a prior session
+- User had to re-explain something already stated in a prior session
 - Explicit frustration ("you keep doing this", "again")
 
-**Low-value noise (discard):**
+**Low-value noise — discard:**
 - "No wait, I meant..." — user correcting their own prompt
-- "Hmm" with no follow-up correction
 - Technical "no" (e.g., "No need to create a test file")
-- Praise-then-correction ("Great work! Oh wait, one thing...")
+- "Hmm" with no follow-up correction
 
-**When multiple signals cluster into one theme:** write one feedback file covering the theme, not one file per signal. Quality over quantity.
+**When multiple signals cluster into one theme:** write one feedback file covering the theme, not one per signal.
