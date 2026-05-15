@@ -1,9 +1,93 @@
 ---
 name: vercel-tools
-description: Vercel CLI recipes for this project — checking migration status, applying migrations to preview/production, watching deployments go ready, debugging failed builds, and pulling historical logs. Use whenever the user asks to run migrations, check deploy status, investigate build errors, or manage Vercel deployments.
+description: >-
+  Vercel CLI recipes — env vars, migrations, deployment status, build debugging,
+  runtime logs, and secrets workflow. INVOKE PROACTIVELY (do not wait for the
+  user to ask) whenever: (1) setting or reading Vercel env vars, (2) a Vercel
+  build or deployment has failed, (3) making any curl/fetch call to a *.vercel.app
+  URL, (4) running migrations post-deploy, (5) the task involves pushing code
+  and checking whether it deployed, or (6) any work touches a project that is
+  deployed on Vercel — even if the original request was a code task.
 ---
 
 # Vercel Tools
+
+## When to invoke (agent-proactive — do not wait to be asked)
+
+Invoke this skill immediately, before attempting any fix, whenever you detect:
+
+| Signal | Action |
+|---|---|
+| A Vercel build has failed | Read "Debug failed builds" before touching code |
+| Setting any env var on a Vercel project | Read "Adding env vars via CLI" — `echo` stores empty strings |
+| Making `curl` to a `*.vercel.app` URL | Stop — read "Preview deployments are behind Vercel SSO" first |
+| Code task transitions into deployment work | Switch context; treat as a new Vercel task |
+| Any mention of `vercel env`, `vercel deploy`, `vercel logs` | Read the relevant section before running the command |
+| Adding a new internal/admin API endpoint | Read "Layered auth checklist" below |
+| Turbopack build errors referencing generated files | Read "Turbopack + generated artifacts" below |
+
+---
+
+## Layered auth checklist (new unprotected endpoints)
+
+When adding any endpoint that must be reachable without a user session, audit **every** layer independently — fixing one does not fix the others:
+
+1. **Vercel deployment protection** — `*.vercel.app` URLs require `vercel curl --deployment`; custom domains may also be protected. Check project settings.
+2. **Next.js middleware / proxy** — add `pathname.startsWith("/api/your-endpoint")` to `isPublicPath()` (or equivalent guard function).
+3. **Route-level guards** — check the route handler itself for session/auth checks.
+
+All three are independent. A fix at layer 2 does not bypass layer 1.
+
+---
+
+## Turbopack + generated artifacts (e.g. Prisma client)
+
+**Symptom:** `Module not found: Can't resolve '../generated/prisma/index'` in a Turbopack build, even though `@arc/domain:build` (or equivalent) shows as a Turbo cache hit.
+
+**Why it happens:** Turbopack bundles TypeScript source files directly — it does NOT use `tsc` output. So even when the domain package build is cached, Turbopack still needs generated artifacts (Prisma client, codegen output, etc.) to exist in the source tree at bundle time.
+
+**Fix:** Add `prisma generate` (or equivalent) to the workspace root `postinstall` script. This runs after every `pnpm install`, regardless of Turbo cache state:
+
+```json
+// package.json (workspace root)
+{
+  "scripts": {
+    "postinstall": "prisma generate --schema=prisma/schema.prisma"
+  }
+}
+```
+
+The domain package `build` script should also run it (for `tsc`), but `postinstall` is what covers Turbopack.
+
+**Related:** `moduleResolution: NodeNext` in tsconfig requires `.js` extensions on imports, which Turbopack cannot resolve to `.ts`. Override in the affected package's tsconfig:
+
+```json
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler"
+  }
+}
+```
+
+---
+
+## Pre-flight: run the build locally before pushing
+
+**Do not push to discover build errors.** Each Vercel deploy cycle is ~60s. A cascade of 5 errors = 5 minutes of avoidable waiting.
+
+Before pushing any fix for a build error:
+```bash
+# Run the full build locally first
+pnpm build --filter @arc/web...
+# or
+turbo run build --filter @arc/web...
+```
+
+Only push when the local build is clean.
+
+---
 
 All commands run from the main repo root. The project cwd flag (`--cwd $HOME/projects/golden-wealth-app`) is required for `vercel` commands when working inside a worktree — the Vercel link only exists in the main checkout.
 

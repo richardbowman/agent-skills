@@ -334,11 +334,24 @@ export async function POST(req: Request) {
 
 1. **Install dependencies**: `pnpm install` (runs `postinstall` automatically)
 2. **Install Vercel DSQL integration** in project settings → Integrations → Aurora DSQL
-3. **(Optional) Set `PGSCHEMA`** in Vercel environment variables to a custom prefix (e.g. `myapp`). If not set, defaults to `app`.
-4. **Deploy to Vercel** — environment variables are injected automatically
-5. **Run migrations** for each environment via the `/admin` panel or:
+3. **Enable OIDC token federation** — this is NOT on by default and is required for `awsCredentialsProvider` to work. Without it every DB call returns 500 at runtime. Enable via the Vercel API or dashboard:
    ```bash
-   curl -X POST https://your-url.vercel.app/api/admin/migrate -H "Content-Type: application/json" -d '{"name":"001_init"}'
+   curl -X PATCH "https://api.vercel.com/v9/projects/$PROJECT_ID?teamId=$TEAM_ID" \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"oidcTokenConfig": {"enabled": true}}'
+   ```
+   Or in the Vercel dashboard: Project Settings → Security → OIDC Token Federation → Enable.
+4. **(Optional) Set `PGSCHEMA`** in Vercel environment variables to a custom prefix (e.g. `myapp`). If not set, defaults to `app`.
+5. **Deploy to Vercel** — environment variables are injected automatically
+6. **Run migrations** — use `vercel curl` (not plain `curl`) since `*.vercel.app` URLs are behind Vercel deployment protection:
+   ```bash
+   vercel curl /api/admin/migrate \
+     --deployment https://your-app-abc123.vercel.app \
+     -- --request POST \
+        --header "Content-Type: application/json" \
+        --header "x-migration-secret: $SECRET" \
+        --data '{"name":"001_init"}'
    ```
 
 ## Critical constraints

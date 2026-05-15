@@ -1,6 +1,12 @@
 ---
 name: dsql-migrate
-description: Generate and apply Prisma migrations for Aurora DSQL with proper multi-schema isolation. Handles DSQL-specific transformations (ASYNC indexes, one DDL per transaction, no FKs) and applies migrations to the correct environment schema (dev/preview/prod).
+description: >-
+  Generate and apply Prisma migrations for Aurora DSQL. Handles DSQL-specific
+  transformations (ASYNC indexes, one DDL per transaction, no FKs) and applies
+  migrations to the correct environment schema (dev/preview/prod). INVOKE
+  PROACTIVELY whenever: touching api/admin/migrate, running migrations after a
+  deploy, seeing any DSQL error at runtime, or setting up a Vercel project that
+  uses Aurora DSQL — even if the user's request was framed as a code task.
 ---
 
 # DSQL Migrate
