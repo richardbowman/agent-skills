@@ -11,7 +11,7 @@ git clone https://github.com/richardbowman/agent-skills.git ~/Projects/agent-ski
 node ~/Projects/agent-skills/bootstrap.js
 ```
 
-This symlinks every skill directory into `~/.claude/skills/` so Claude Code picks them up automatically. Re-run after pulling to pick up new skills.
+This symlinks every skill directory into `~/.claude/skills/` and every hook script in `hooks/` into `~/.claude/hooks/` so Claude Code picks them up automatically. Re-run after pulling to pick up new skills or hooks.
 
 > **Note:** `claude-config`'s bootstrap clones this repo as a sibling directory and runs `bootstrap.js` automatically — you only need the above command for standalone setup.
 
@@ -44,9 +44,24 @@ This symlinks every skill directory into `~/.claude/skills/` so Claude Code pick
 | `worktree-bootstrap` | Prep a git worktree for local Next.js dev |
 | `youtube-watch-history-organizer` | Organize YouTube watch history into Obsidian |
 
+## Hooks
+
+Scripts in `hooks/` are symlinked into `~/.claude/hooks/` by `bootstrap.js`. They fire automatically based on the hook event configured in `~/.claude/settings.json`.
+
+| Hook | Event | Purpose |
+|---|---|---|
+| `require-worktree.sh` | `PreToolUse` (Edit/Write) | Blocks edits to `~/projects/` unless you're in a linked git worktree |
+
 ## Adding a skill
 
 1. Create `<skill-name>/SKILL.md` (or `<skill-name>/README.md`) in this repo
 2. Run `node <projects-dir>/agent-skills/bootstrap.js` to symlink it
 3. Add the trigger to `~/.claude/CLAUDE.md`
 4. Commit and push — other machines pick it up on next bootstrap
+
+## Adding a hook
+
+1. Add the script to `hooks/` in this repo
+2. Run `node <projects-dir>/agent-skills/bootstrap.js` to symlink it into `~/.claude/hooks/`
+3. Register it in `~/.claude/settings.json` (or `claude-config/settings.json`) under the appropriate `hooks` event
+4. Commit and push — other machines get the script on next bootstrap (settings wiring is handled by `claude-config`)
