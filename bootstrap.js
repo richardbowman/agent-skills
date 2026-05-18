@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// bootstrap.js — symlink all skills from this repo into ~/.claude/skills/
+// bootstrap.js — symlink all skills and hooks from this repo into ~/.claude/
 // Run from the repo root: node bootstrap.js
 
 'use strict';
@@ -11,8 +11,10 @@ const os   = require('node:os');
 const REPO       = path.dirname(fs.realpathSync(__filename));
 const CLAUDE     = path.join(os.homedir(), '.claude');
 const SKILLS_DST = path.join(CLAUDE, 'skills');
+const HOOKS_DST  = path.join(CLAUDE, 'hooks');
 
 fs.mkdirSync(SKILLS_DST, { recursive: true });
+fs.mkdirSync(HOOKS_DST,  { recursive: true });
 
 function link(src, dst) {
   let existing = null;
@@ -44,13 +46,30 @@ console.log('');
 // Link every directory (skill) and .md flat files in the repo root
 let count = 0;
 for (const name of fs.readdirSync(REPO).sort()) {
-  if (name.startsWith('.') || name === 'bootstrap.js' || name === 'README.md') continue;
+  if (name.startsWith('.') || name === 'bootstrap.js' || name === 'README.md' || name === 'hooks') continue;
   const src = path.join(REPO, name);
   const st  = fs.statSync(src);
   if (!st.isDirectory() && !name.endsWith('.md')) continue;
   link(src, path.join(SKILLS_DST, name));
   count++;
 }
+
+// Link every script in hooks/ into ~/.claude/hooks/
+console.log('');
+console.log(`==> hooks → ${HOOKS_DST}`);
+const HOOKS_SRC = path.join(REPO, 'hooks');
+let hookCount = 0;
+if (fs.existsSync(HOOKS_SRC)) {
+  for (const name of fs.readdirSync(HOOKS_SRC).sort()) {
+    const src = path.join(HOOKS_SRC, name);
+    if (!fs.statSync(src).isFile()) continue;
+    // Ensure the hook is executable
+    fs.chmodSync(src, 0o755);
+    link(src, path.join(HOOKS_DST, name));
+    hookCount++;
+  }
+}
+if (hookCount === 0) console.log('  (none)');
 
 // Prune stale symlinks that pointed into this repo but were renamed/deleted
 console.log('');
@@ -68,4 +87,4 @@ for (const name of fs.readdirSync(SKILLS_DST)) {
 }
 
 console.log('');
-console.log(`==> Done — ${count} skills linked into ${SKILLS_DST}`);
+console.log(`==> Done — ${count} skills, ${hookCount} hooks linked into ${CLAUDE}`);
