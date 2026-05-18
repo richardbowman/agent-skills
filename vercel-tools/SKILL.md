@@ -307,11 +307,88 @@ echo "$MY_SECRET" | vercel env add MY_SECRET production
 
 ---
 
+## Deployment Protection Bypass for Automation
+
+When a project has Vercel SSO/deployment protection enabled, agents and CI systems need a bypass secret to reach it without SSO. There are **two separate steps** — both are required.
+
+### Step 1: Register the bypass secret in Project Protection settings
+
+Setting `VERCEL_AUTOMATION_BYPASS_SECRET` as a regular env var does **not** automatically enable the bypass. The secret must be explicitly registered via the Vercel REST API:
+
+```bash
+# Get your auth token
+TOKEN=$(python3 -c "import json; print(json.load(open('$(python3 -c "import os; print(os.path.expanduser(\"~/Library/Application Support/com.vercel.cli/auth.json\"))")'))['token'])")
+
+PROJECT_ID="prj_..."   # from .vercel/project.json
+TEAM_ID="team_..."     # from .vercel/project.json
+BYPASS_SECRET="$(openssl rand -hex 16)"  # must be exactly 32 hex chars (alphanumeric)
+
+curl -s -X PATCH \
+  "https://api.vercel.com/v1/projects/${PROJECT_ID}/protection-bypass?teamId=${TEAM_ID}" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"generate\":{\"secret\":\"${BYPASS_SECRET}\",\"note\":\"Agent/CI automation bypass\"}}"
+```
+
+The response will include the secret under `protectionBypass`. **The secret must be 32 alphanumeric characters** (`^[a-zA-Z0-9]{32}$`) — hex output from `openssl rand -hex 16` is exactly 32 chars and meets this requirement.
+
+### Step 2: Use the bypass header in requests
+
+Once registered, pass the secret via the `x-vercel-protection-bypass` header on every request:
+
+```bash
+curl -s -X POST "https://your-project.vercel.app/api/your-endpoint" \
+  -H "x-vercel-protection-bypass: ${BYPASS_SECRET}" \
+  -H "Content-Type: application/json" \
+  -d '...'
+```
+
+Or with `vercel curl`:
+
+```bash
+vercel curl /api/your-endpoint \
+  --deployment "https://your-project.vercel.app" \
+  --protection-bypass "$BYPASS_SECRET" \
+  -- --request POST \
+     --header "Content-Type: application/json" \
+     --data '...'
+```
+
+### Store the bypass secret in Keeper
+
+```bash
+# Store it — the secret is 32 chars, store exactly as-is
+keeper shell <<EOF
+record-add --record-type login --title "MyProject — Vercel Bypass Secret"
+EOF
+# Then update with the actual value
+BYPASS_UID="..."   # UID from the record-add output
+keeper shell <<EOF
+record-update -r $BYPASS_UID "password=${BYPASS_SECRET}" "notes=x-vercel-protection-bypass header value. Registered in Vercel project protection settings."
+EOF
+```
+
+### Verify the bypass is working
+
+A successful bypass returns your API response (not an HTML SSO page). If you still get HTML with `Authentication Required` in the title, the secret is not registered correctly — confirm via:
+
+```bash
+curl -s "https://api.vercel.com/v9/projects/${PROJECT_ID}?teamId=${TEAM_ID}" \
+  -H "Authorization: Bearer $TOKEN" | \
+  python3 -c "import json,sys; d=json.load(sys.stdin); print(list(d.get('protectionBypass',{}).keys()))"
+```
+
+Your 32-char secret should appear as a key in the output.
+
+---
+
 ## Common gotchas
 
 - **`vercel ls` output goes to stderr** — always use `2>&1`
 - **Env var trailing newline** — always use `printf '%s'` (not `echo`) when piping values to `vercel env add`; a stored newline causes `403 Forbidden` at runtime
-- **Preview deployments are behind Vercel SSO** — plain `curl` gets an HTML login page; always use `vercel curl --deployment`
+- **Preview deployments are behind Vercel SSO** — plain `curl` gets an HTML login page; always use `vercel curl --deployment` or the protection bypass header
+- **Bypass secret ≠ env var** — setting `VERCEL_AUTOMATION_BYPASS_SECRET` as an env var does NOT enable the bypass; you must register it via the REST API (see "Deployment Protection Bypass" above)
+- **Bypass secret must be exactly 32 alphanumeric chars** — use `openssl rand -hex 16` (produces 32 hex chars); longer values will be rejected with a pattern error
 - **Migration errors don't block recording** — if a migration has `✗` lines, it's still marked applied; write a follow-up fix migration rather than re-running
 - **DSQL: no `ADD COLUMN NOT NULL DEFAULT`** — split into nullable `ADD COLUMN` + `UPDATE ... WHERE col IS NULL` backfill
 - **Worktree cwd** — always pass `--cwd $MAIN_REPO` when running Vercel CLI from a worktree
