@@ -6,9 +6,16 @@
 #
 # Options:
 #   --cwd <dir>       Project directory (default: $PWD, used to resolve git repo)
-#   --sha <sha>       Git commit SHA to wait for (default: HEAD of --cwd)
+#   --sha <sha>       Git commit SHA to wait for (see SHA resolution below)
 #   --target <env>    Environment filter substring, case-insensitive (default: any)
 #   --timeout <secs>  Max seconds to wait (default: 600)
+#
+# SHA resolution (when --sha is not provided):
+#   --target production (or no target): uses origin/main — the squash-merge SHA
+#   --target preview (or any non-production target): uses the remote tracking
+#     branch of the current local branch in --cwd, so the right preview SHA is
+#     always resolved without needing to pass it manually
+#   --sha always overrides the above logic
 #
 # Outputs the deployment URL on success; exits 1 on error or timeout.
 # Writes the URL to /tmp/vercel_prod_url.txt on success for subsequent steps.
@@ -43,10 +50,38 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ -z "$TARGET" ]]; then
+  echo "Error: --target is required. Use --target production or --target preview." >&2
+  echo "Explicit targets prevent a failing preview/production deployment from poisoning the result." >&2
+  exit 1
+fi
+
 if [[ -z "$SHA" ]]; then
-  # Fetch so origin/HEAD reflects squash merges and other remote-only commits
+  # Fetch so remote refs reflect the latest squash-merges and branch pushes
   git -C "$CWD" fetch origin --quiet 2>/dev/null || true
-  SHA=$(git -C "$CWD" rev-parse origin/HEAD 2>/dev/null || git -C "$CWD" rev-parse HEAD)
+
+  TARGET_LC=$(echo "$TARGET" | tr '[:upper:]' '[:lower:]')
+  if [[ "$TARGET_LC" == "production" ]]; then
+    # Production: always use origin/main (squash-merge lands here)
+    SHA=$(git -C "$CWD" rev-parse origin/main 2>/dev/null \
+       || git -C "$CWD" rev-parse origin/HEAD 2>/dev/null \
+       || git -C "$CWD" rev-parse HEAD)
+    echo "Resolved production SHA from origin/main"
+  else
+    # Preview: use the remote tracking branch of the current local branch
+    LOCAL_BRANCH=$(git -C "$CWD" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+    if [[ -n "$LOCAL_BRANCH" && "$LOCAL_BRANCH" != "HEAD" ]]; then
+      SHA=$(git -C "$CWD" rev-parse "origin/$LOCAL_BRANCH" 2>/dev/null || "")
+      if [[ -n "$SHA" ]]; then
+        echo "Resolved preview SHA from origin/$LOCAL_BRANCH"
+      fi
+    fi
+    # Fall back to current HEAD if remote tracking branch not found
+    if [[ -z "$SHA" ]]; then
+      SHA=$(git -C "$CWD" rev-parse HEAD)
+      echo "Warning: no remote tracking branch found, using local HEAD" >&2
+    fi
+  fi
 else
   # Expand short SHAs to full 40-char; also validates the SHA exists locally
   SHA=$(git -C "$CWD" rev-parse "$SHA" 2>/dev/null || echo "$SHA")
@@ -62,18 +97,14 @@ fi
 
 DEADLINE=$(( $(date +%s) + TIMEOUT ))
 
-TARGET_LABEL="${TARGET:-any}"
+TARGET_LABEL="$TARGET"
 echo "Waiting for deployment of $SHA in $REPO (target: $TARGET_LABEL) ..."
 
 # Step 1: Wait for a GitHub deployment to appear for this SHA + environment
 DEPLOY_ID=""
 while true; do
-  if [[ -n "$TARGET" ]]; then
-    TARGET_LC=$(echo "$TARGET" | tr '[:upper:]' '[:lower:]')
-    JQ_FILTER="[.[] | select(.environment | ascii_downcase | contains(\"$TARGET_LC\"))] | .[0].id // empty"
-  else
-    JQ_FILTER=".[0].id // empty"
-  fi
+  TARGET_LC=$(echo "$TARGET" | tr '[:upper:]' '[:lower:]')
+  JQ_FILTER="[.[] | select(.environment | ascii_downcase | contains(\"$TARGET_LC\"))] | .[0].id // empty"
   DEPLOY_ID=$(gh api "repos/$REPO/deployments?sha=$SHA&per_page=20" \
     --jq "$JQ_FILTER" \
     2>&1) || { echo "  gh api error (will retry): $DEPLOY_ID"; DEPLOY_ID=""; }
