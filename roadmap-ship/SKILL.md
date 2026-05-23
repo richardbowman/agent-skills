@@ -32,7 +32,7 @@ vercel curl /api/roadmap \
 ## Step 2 — Wait for deploy (if just merged)
 
 ```bash
-vercel-wait-deploy --cwd $MAIN_REPO
+vercel-wait-deploy --cwd $MAIN_REPO --target production
 # Updates /tmp/vercel_prod_url.txt on success
 DEPLOY=$(cat /tmp/vercel_prod_url.txt)
 ```

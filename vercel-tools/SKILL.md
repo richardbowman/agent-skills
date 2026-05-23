@@ -160,20 +160,23 @@ Use after merging to main (production) or pushing a PR branch (preview). Use the
 
 ```bash
 # Wait for production (after merging to main):
-vercel-wait-deploy --cwd $MAIN_REPO
+vercel-wait-deploy --cwd $MAIN_REPO --target production
 
-# Wait for a specific SHA (e.g., a PR preview):
-vercel-wait-deploy --cwd $MAIN_REPO --sha <commit-sha>
-
-# Narrow to a specific target (optional):
+# Wait for a preview deployment:
 vercel-wait-deploy --cwd $MAIN_REPO --target preview
+
+# Explicit SHA override when needed:
+vercel-wait-deploy --cwd $MAIN_REPO --target production --sha <commit-sha>
 ```
+
+`--target` is required — omitting it is an error. Without it, a failing deployment in a different
+environment (e.g., a preview branch missing env vars) can poison the result for the same SHA.
 
 Options:
 - `--cwd <dir>` — project root containing `.vercel/project.json` (required when in a worktree)
-- `--sha <sha>` — commit SHA to wait for (default: HEAD of `--cwd`)
+- `--target <target>` — `production` or `preview` (**required**)
+- `--sha <sha>` — commit SHA override (auto-resolved from target when omitted)
 - `--timeout <secs>` — max wait time in seconds (default: 600)
-- `--target <target>` — `production` or `preview` (default: searches all targets by SHA)
 
 On success, prints the stable **branch alias URL** (e.g. `https://v0-app-git-my-branch-team.vercel.app`) and writes it to `/tmp/vercel_prod_url.txt`. Falls back to the per-deploy hash URL if no alias is found.
 
