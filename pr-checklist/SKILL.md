@@ -54,6 +54,8 @@ pnpm test:e2e   # use the e2e-local skill to set up environment first
 - Any new or changed user-facing flow has a corresponding E2E test
 - All existing E2E tests still pass
 
+**If the test command crashes before running any tests** (e.g. "Vitest cannot be imported in CommonJS", "command not found", process exits before reporter output): this is a **tooling bug, not a test failure**. Stop and fix the tooling before treating any work as done. Common causes in pnpm monorepos: wrong binary path, missing root `playwright.config.ts`, test runner scanning the wrong directories. See the `playwright-e2e` skill for monorepo gotchas.
+
 ## Step 4 — Docs Review
 
 - Read every doc page in `docs/` (or equivalent) related to the changed feature
@@ -92,3 +94,37 @@ Invoke this skill proactively at the end of any development task — before
 declaring it done, before asking the user to review, and before opening a PR.
 The user should never have to ask "did you run the tests?" — that should always
 already be done.
+
+## Making This Structural (Autonomous Work)
+
+"Invoke proactively" is voluntary and fails under momentum. If you are doing
+autonomous work on a project — especially multi-step builds where you will push
+multiple times — install the enforcement hook **before starting**, not after
+something breaks.
+
+Check whether `.claude/settings.json` exists in the project root. If it doesn't,
+create it with this hook:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git push*)",
+            "command": "jq -r 'if (.tool_input.command | test(\"git push\")) then {\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"QUALITY GATE: You just pushed to git. Before declaring this work done you MUST: (1) run pnpm tsc --noEmit, (2) run pnpm test, (3) run pnpm test:e2e and verify all pass, (4) confirm new user-facing flows have E2E tests, (5) confirm docs updated if behavior changed. Do not tell the user the work is done until this checklist is complete.\"}} | tojson else empty end'",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+This injects a blocking reminder into context after every `git push`, making
+the checklist structural rather than voluntary. Commit `.claude/settings.json`
+so it applies to the whole project, not just one session.
