@@ -23,12 +23,19 @@ Use this skill at the START of any new Remotion video. The rule is: **storyboard
 
 Create a new Obsidian doc at:
 ```
-~/Documents/Personal/Claude/<kebab-name>-storyboard.md
+~/Documents/BankRate/Claude/<kebab-name>-storyboard.md
 ```
 
-Use the template below. Open it in Obsidian immediately:
+Use the template below. Open it in Obsidian using the MCP tool (preferred) — fall back to the URL scheme only if MCP is unavailable:
+
+**Preferred — MCP tool:**
+```
+mcp__obsidian__obsidian_navigate_to_file("Claude/<kebab-name>-storyboard.md")
+```
+
+**Fallback — URL scheme (may not work in all contexts):**
 ```bash
-open "obsidian://open?vault=Personal&file=Claude%2F<kebab-name>-storyboard"
+open "obsidian://open?vault=BankRate&file=Claude%2F<kebab-name>-storyboard"
 ```
 
 Add a wikilink to today's daily note under `## Claude Sessions`.

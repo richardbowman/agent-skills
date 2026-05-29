@@ -6,8 +6,10 @@ description: >-
   user to ask) whenever: (1) setting or reading Vercel env vars, (2) a Vercel
   build or deployment has failed, (3) making any curl/fetch call to a *.vercel.app
   URL, (4) running migrations post-deploy, (5) the task involves pushing code
-  and checking whether it deployed, or (6) any work touches a project that is
-  deployed on Vercel — even if the original request was a code task.
+  and checking whether it deployed, (6) any work touches a project that is
+  deployed on Vercel — even if the original request was a code task, or (7) after
+  ANY git push to a branch with an open PR — always run vercel-wait-deploy and
+  surface the preview URL without being asked.
 ---
 
 # Vercel Tools
@@ -25,6 +27,18 @@ Invoke this skill immediately, before attempting any fix, whenever you detect:
 | Any mention of `vercel env`, `vercel deploy`, `vercel logs` | Read the relevant section before running the command |
 | Adding a new internal/admin API endpoint | Read "Layered auth checklist" below |
 | Turbopack build errors referencing generated files | Read "Turbopack + generated artifacts" below |
+
+---
+
+## Auto-wait rule: always surface the preview URL after pushing to an open PR
+
+**After every `git push` to a branch that has an open PR, automatically:**
+
+1. Run `vercel-wait-deploy --cwd $MAIN_REPO --target preview` (do not ask the user first)
+2. Post the resulting preview URL to the user as soon as the deployment is ready
+3. If the deployment fails, immediately run `vercel inspect <url> --logs` and diagnose — do not wait to be asked
+
+This applies whether you pushed a fix, a new feature, or a single-line change. The user should never have to ask "what's the URL?" after a push.
 
 ---
 
@@ -396,3 +410,4 @@ Your 32-char secret should appear as a key in the output.
 - **DSQL: no `ADD COLUMN NOT NULL DEFAULT`** — split into nullable `ADD COLUMN` + `UPDATE ... WHERE col IS NULL` backfill
 - **Worktree cwd** — always pass `--cwd $MAIN_REPO` when running Vercel CLI from a worktree
 - **`--level error` doesn't exist** — use `--status-code 500` or `--query "error"` instead
+- **Empty string from `vercel env pull` ≠ missing value** — env vars marked as `sensitive` (secret-level) return an empty string when pulled; an empty string does NOT mean the value is unset or blank in Vercel. Never assume the value needs to be re-entered based on `vercel env pull` output alone.

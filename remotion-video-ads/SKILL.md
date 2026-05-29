@@ -40,57 +40,74 @@ The opening hook ("If something happened to you tomorrow…") is the most import
 
 ---
 
-## Step 2 — Generate TTS with OpenAI
+## Step 2 — Generate TTS
+
+**Preferred: ElevenLabs (Rick's voice clone) — includes character-level timestamps, no Whisper needed**
+
+Rick's voice clone ID: `bj8CeNFqDyK94BSJTsDJ`
+Keeper record: "ElevenLabs Personal Claude Key" (search `elevenlabs`)
 
 ```ts
-// Run inline (do not create a reusable script — do it live)
+// Install: npm install elevenlabs
+import { ElevenLabsClient } from 'elevenlabs'
+import fs from 'fs'
+
+const client = new ElevenLabsClient({ apiKey: process.env.ELEVENLABS_API_KEY })
+
+const response = await client.textToSpeech.convertWithTimestamps(
+  'bj8CeNFqDyK94BSJTsDJ',  // Rick's voice clone
+  {
+    text: SCRIPT,
+    modelId: 'eleven_multilingual_v2',
+    outputFormat: 'mp3_44100_128',
+  }
+)
+
+// response.audio_base64 = the MP3, response.alignment = character timestamps
+const buffer = Buffer.from(response.audio_base64, 'base64')
+fs.writeFileSync('public/ads/narration.mp3', buffer)
+
+// Convert character timestamps → frame numbers at 30fps
+// response.alignment.characters, .character_start_times_seconds, .character_end_times_seconds
+const chars = response.alignment
+chars.characters.forEach((ch, i) => {
+  const startF = Math.round(chars.character_start_times_seconds[i] * 30)
+  const endF   = Math.round(chars.character_end_times_seconds[i] * 30)
+  process.stdout.write(`${ch}(${startF}-${endF}) `)
+})
+```
+
+To map to scenes, group characters by sentence/phrase and take the `endF` of the last character in each phrase as the scene cut point.
+
+**Fallback: OpenAI TTS + Whisper** (use if ElevenLabs unavailable)
+
+```ts
 import OpenAI from 'openai'
 import fs from 'fs'
 
 const openai = new OpenAI()
+
+// Step A — generate audio
 const mp3 = await openai.audio.speech.create({
   model: 'tts-1-hd',
-  voice: 'onyx',          // deep, authoritative — matches the brand
+  voice: 'onyx',
   input: SCRIPT,
 })
-const buffer = Buffer.from(await mp3.arrayBuffer())
-fs.writeFileSync('public/ads/narration-9x16.mp3', buffer)
-```
+fs.writeFileSync('public/ads/narration.mp3', Buffer.from(await mp3.arrayBuffer()))
 
-**Critical:** `tts-1-hd` outputs at **160kbps**, not 320kbps. Never estimate duration from file size + assumed bitrate. Always verify with Whisper (Step 3).
-
----
-
-## Step 3 — Whisper transcription for exact timing
-
-Feed the MP3 back to Whisper with `verbose_json` to get segment-level timestamps:
-
-```ts
+// Step B — get timestamps via Whisper (separate call required)
 const transcription = await openai.audio.transcriptions.create({
-  file: fs.createReadStream('public/ads/narration-9x16.mp3'),
+  file: fs.createReadStream('public/ads/narration.mp3'),
   model: 'whisper-1',
   response_format: 'verbose_json',
   timestamp_granularities: ['segment'],
 })
-
-// Convert timestamps → frames at 30fps
 transcription.segments.forEach(seg => {
-  console.log(`"${seg.text.trim()}" → start=${Math.round(seg.start * 30)}f end=${Math.round(seg.end * 30)}f`)
+  console.log(`"${seg.text.trim()}" → ${Math.round(seg.start * 30)}f–${Math.round(seg.end * 30)}f`)
 })
 ```
 
-Map each spoken phrase to the scene it belongs in. Use the **end frame of the last word in a phrase** as the scene cut point — don't cut mid-word.
-
-**Example output for 9x16:**
-```
-"If something happened to you tomorrow..." → 0f–122f    → Scene1
-"Golden Wealth gets you organized."        → 122f–182f  → Scene2
-"Link your accounts..."                    → 182f–307f  → Scene3 / Accounts
-"Upload your will..."                      → 307f–442f  → Scene3 / Documents
-"Set who sees what..."                     → 442f–624f  → Scene3 / Access
-"You've done the hard part..."             → 624f–666f  → Scene4 (mid-CTA)
-"Now finish the plan."                     → 666f–810f  → EndCard
-```
+**Critical (OpenAI only):** `tts-1-hd` outputs at **160kbps**, not 320kbps. Never estimate duration from file size.
 
 ---
 
@@ -252,8 +269,10 @@ Five campaign concepts live in `marketing/briefs/` on the `ads-landing` branch:
 
 | Lesson | Detail |
 |---|---|
-| TTS bitrate | OpenAI `tts-1-hd` outputs 160kbps, not 320kbps. Never estimate duration from file size. |
-| Always Whisper | After generating TTS, always run Whisper to get exact segment timestamps before hardcoding frame numbers. |
+| ElevenLabs preferred | Use `convertWithTimestamps` — returns audio + character-level timing in one call. No Whisper needed. |
+| Rick's voice clone | ElevenLabs voice ID `bj8CeNFqDyK94BSJTsDJ`. Key in Keeper: "ElevenLabs Personal Claude Key". |
+| OpenAI TTS bitrate | `tts-1-hd` outputs 160kbps, not 320kbps. Never estimate duration from file size. |
+| OpenAI needs Whisper | OpenAI TTS has no built-in timestamps — always run Whisper separately to get segment timing. |
 | oklch in Remotion | Safe in `background:` string values, but NEVER append hex-alpha to an oklch string. |
 | `useCurrentFrame` scope | Resets to 0 inside each `<Sequence>`. Composition-wide animations must live outside all Sequences. |
 | `flexDirection` | Always set explicitly in Remotion inline styles — don't rely on default. Missing it caused 16:9 feature scenes to stack vertically. |

@@ -2,3 +2,4 @@
 **/local-preferences.md
 **/.env
 **/.env.local
+.exclude

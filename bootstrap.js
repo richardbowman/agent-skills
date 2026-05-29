@@ -38,15 +38,27 @@ function link(src, dst) {
   console.log(`  link   ${path.basename(dst)}`);
 }
 
+// Load excluded skills from optional .exclude file (machine-local, gitignored)
+const EXCLUDE_FILE = path.join(REPO, '.exclude');
+const excluded = new Set();
+if (fs.existsSync(EXCLUDE_FILE)) {
+  for (const line of fs.readFileSync(EXCLUDE_FILE, 'utf8').split('\n')) {
+    const name = line.trim();
+    if (name && !name.startsWith('#')) excluded.add(name);
+  }
+}
+
 console.log('==> claude-skills bootstrap');
 console.log(`    repo:   ${REPO}`);
 console.log(`    target: ${SKILLS_DST}`);
+if (excluded.size) console.log(`    excluded (${excluded.size}): ${[...excluded].join(', ')}`);
 console.log('');
 
 // Link every directory (skill) and .md flat files in the repo root
 let count = 0;
 for (const name of fs.readdirSync(REPO).sort()) {
   if (name.startsWith('.') || name === 'bootstrap.js' || name === 'README.md' || name === 'hooks') continue;
+  if (excluded.has(name)) { console.log(`  skip   ${name}  (excluded)`); continue; }
   const src = path.join(REPO, name);
   const st  = fs.statSync(src);
   if (!st.isDirectory() && !name.endsWith('.md')) continue;
@@ -71,7 +83,7 @@ if (fs.existsSync(HOOKS_SRC)) {
 }
 if (hookCount === 0) console.log('  (none)');
 
-// Prune stale symlinks that pointed into this repo but were renamed/deleted
+// Prune stale symlinks that pointed into this repo but were renamed/deleted or excluded
 console.log('');
 for (const name of fs.readdirSync(SKILLS_DST)) {
   const dst = path.join(SKILLS_DST, name);
@@ -82,6 +94,9 @@ for (const name of fs.readdirSync(SKILLS_DST)) {
   if (!target.startsWith(REPO + path.sep)) continue;
   if (!fs.existsSync(target)) {
     console.log(`  prune  ${name}  (dangling -> ${target})`);
+    fs.unlinkSync(dst);
+  } else if (excluded.has(name)) {
+    console.log(`  prune  ${name}  (excluded)`);
     fs.unlinkSync(dst);
   }
 }
