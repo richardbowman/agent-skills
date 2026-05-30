@@ -176,18 +176,28 @@ Use after merging to main (production) or pushing a PR branch (preview). Use the
 # Wait for production (after merging to main):
 vercel-wait-deploy --cwd $MAIN_REPO --target production
 
-# Wait for a preview deployment:
+# Wait for a preview deployment FROM A WORKTREE:
+# --cwd points to main repo (has .vercel/project.json)
+# --git-cwd points to the worktree (has the feature branch checked out)
+vercel-wait-deploy --cwd $MAIN_REPO --git-cwd $WORKTREE --target preview
+
+# Wait for a preview deployment from the main repo itself:
 vercel-wait-deploy --cwd $MAIN_REPO --target preview
 
 # Explicit SHA override when needed:
 vercel-wait-deploy --cwd $MAIN_REPO --target production --sha <commit-sha>
 ```
 
+**Important:** When working in a git worktree, always pass `--git-cwd <worktree-path>`. Without it,
+the script resolves the branch from `--cwd` (the main repo, which is on `main`), and looks up
+`origin/main`'s SHA instead of the feature branch's SHA.
+
 `--target` is required — omitting it is an error. Without it, a failing deployment in a different
 environment (e.g., a preview branch missing env vars) can poison the result for the same SHA.
 
 Options:
-- `--cwd <dir>` — project root containing `.vercel/project.json` (required when in a worktree)
+- `--cwd <dir>` — Vercel project root containing `.vercel/project.json` (required when in a worktree)
+- `--git-cwd <dir>` — git repo for SHA/branch resolution; defaults to `--cwd`. Set to the worktree path when `--cwd` is the main checkout.
 - `--target <target>` — `production` or `preview` (**required**)
 - `--sha <sha>` — commit SHA override (auto-resolved from target when omitted)
 - `--timeout <secs>` — max wait time in seconds (default: 600)
