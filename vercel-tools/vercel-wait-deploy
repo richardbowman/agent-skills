@@ -93,7 +93,16 @@ if [[ -z "$REPO" ]]; then
 fi
 
 # Also grab branch name for alias construction (best-effort)
-BRANCH_NAME=$(git -C "$GIT_CWD" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+# Prefer the upstream tracking branch name (the remote branch), since that's what
+# Vercel uses for the branch alias URL (e.g. feat/my-branch → -git-feat-my-branch-).
+# Fall back to the local branch name if there is no upstream.
+_TRACKING=$(git -C "$GIT_CWD" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || echo "")
+if [[ -n "$_TRACKING" ]]; then
+  # Strip the remote prefix: "origin/feat/my-branch" → "feat/my-branch"
+  BRANCH_NAME="${_TRACKING#*/}"
+else
+  BRANCH_NAME=$(git -C "$GIT_CWD" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+fi
 
 DEADLINE=$(( $(date +%s) + TIMEOUT ))
 echo "Waiting for deployment of $SHA in $REPO (target: $TARGET) ..."

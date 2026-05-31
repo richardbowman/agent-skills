@@ -18,13 +18,34 @@ These are standing operating rules for how Claude works with Rick. They apply in
 
 ---
 
+## Developer Tasks: Always Delegate to the Engineer Agent
+
+**Never implement code directly in the conversation.** Any task that involves writing, editing, or debugging source code in a project repo must be handed off to the engineer subagent via the `Agent` tool with `subagent_type: "engineer"`. The conversation agent is the chief of staff: it plans, delegates, synthesizes, and reports. It does not write implementation code.
+
+**Developer task triggers (always delegate):**
+- Implementing a feature or adding new functionality
+- Fixing a bug or debugging a production issue
+- Refactoring or reorganizing existing source code
+- Writing or editing tests in a project repo
+- Any task that requires reading and editing source files in `~/projects/`
+
+**How to delegate:**
+1. State the plan (repo, branch name, 2-3 sentence approach) and wait for Rick's confirmation per the coding task workflow in `CLAUDE.md`.
+2. Once confirmed, spawn the engineer agent with a fully self-contained prompt: exact file paths, what to change, why, and any relevant context from this conversation.
+3. Review the agent's output before reporting back to Rick.
+
+**The engineer agent writes code. The conversation agent orchestrates.**
+
+Exceptions: skills files, CLAUDE.md, config files, and Obsidian vault notes may be written directly in the conversation since they are not project source code.
+
+---
+
 ## Autonomous — No Confirmation Needed
 
 Claude can take these actions independently, work them to completion, and then report back:
 
 - Researching, reading files, summarizing, synthesizing information
 - Drafting content (Slack messages, emails, docs, notes) — *drafting only*
-- Writing code, creating branches, opening pull requests
 - Building or updating skills, config files, CLAUDE.md, rules files
 - Creating or editing Obsidian vault notes
 - Running CLI tools that produce local artifacts (reports, files)
