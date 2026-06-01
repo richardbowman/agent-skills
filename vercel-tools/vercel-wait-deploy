@@ -19,7 +19,7 @@
 #                        branch in --git-cwd (or --cwd if not set)
 #   --sha always overrides the above logic
 #
-# Outputs the branch-persistent alias URL on success (falls back to hash URL).
+# Outputs the branch alias URL if one exists, otherwise the hash URL — never guesses.
 # Writes the URL to /tmp/vercel_prod_url.txt on success for subsequent steps.
 
 set -euo pipefail
@@ -92,18 +92,6 @@ if [[ -z "$REPO" ]]; then
   exit 1
 fi
 
-# Also grab branch name for alias construction (best-effort)
-# Prefer the upstream tracking branch name (the remote branch), since that's what
-# Vercel uses for the branch alias URL (e.g. feat/my-branch → -git-feat-my-branch-).
-# Fall back to the local branch name if there is no upstream.
-_TRACKING=$(git -C "$GIT_CWD" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || echo "")
-if [[ -n "$_TRACKING" ]]; then
-  # Strip the remote prefix: "origin/feat/my-branch" → "feat/my-branch"
-  BRANCH_NAME="${_TRACKING#*/}"
-else
-  BRANCH_NAME=$(git -C "$GIT_CWD" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
-fi
-
 DEADLINE=$(( $(date +%s) + TIMEOUT ))
 echo "Waiting for deployment of $SHA in $REPO (target: $TARGET) ..."
 
@@ -138,35 +126,19 @@ while true; do
   echo "  status: $STATUS"
 
   if [[ "$STATUS" == "success" ]]; then
-    # Try to get the stable branch alias URL from `vercel ls`
-    # Branch aliases look like: {project}-git-{branch-slug}-{team}.vercel.app
-    # The hash URL looks like:  {project}-{hash}-{team}.vercel.app
-    # We prefer any alias that is NOT the per-deploy hash URL.
+    # Try to get a stable branch alias URL (e.g. -git-{branch}-{team}.vercel.app).
+    # If no alias exists (most projects only get hash URLs), fall back to DEPLOY_URL.
+    # Never construct/guess a URL — only return URLs we've confirmed exist.
     ALIAS_URL=""
 
-    # Method 1: vercel inspect (lists all aliases for the deployment)
+    # Method 1: vercel inspect lists all aliases assigned to this specific deployment
     if [[ -n "$DEPLOY_URL" ]]; then
-      ALIAS_URL=$(vercel inspect "$DEPLOY_URL" --scope "$(cat "$CWD/.vercel/project.json" | python3 -c "import sys,json; print(json.load(sys.stdin).get('orgId',''))" 2>/dev/null || true)" 2>/dev/null \
-        | grep -Eo 'https://[a-zA-Z0-9._-]+\.vercel\.app' \
-        | grep -v "$(echo "$DEPLOY_URL" | grep -Eo '[a-zA-Z0-9]+-[a-zA-Z0-9]+-rbcodelabs' | head -1 || true)" \
+      ALIAS_URL=$(vercel inspect "$DEPLOY_URL" 2>/dev/null \
+        | grep -Eo 'https://[a-zA-Z0-9._-]+-git-[a-zA-Z0-9._-]+\.vercel\.app' \
         | head -1 || true)
     fi
 
-    # Method 2: construct from branch name (reliable when branch name is known)
-    # Hash URL pattern: https://{project}-{hash9}-{team}.vercel.app
-    # Vercel deploy hashes are always exactly 9 lowercase alphanumeric chars.
-    if [[ -z "$ALIAS_URL" && -n "$BRANCH_NAME" && "$BRANCH_NAME" != "HEAD" && "$BRANCH_NAME" != "main" ]]; then
-      if [[ "$DEPLOY_URL" =~ https://(.+)-([a-z0-9]{9})-([a-zA-Z0-9-]+)\.vercel\.app ]]; then
-        PROJECT_SLUG="${BASH_REMATCH[1]}"
-        TEAM_SLUG="${BASH_REMATCH[3]}"
-        # Slugify branch: replace / and _ with -, lowercase, truncate to 50 chars
-        BRANCH_SLUG=$(echo "$BRANCH_NAME" | tr '[:upper:]' '[:lower:]' | sed 's|[/_]|-|g; s|[^a-z0-9-]||g' | cut -c1-50)
-        ALIAS_URL="https://${PROJECT_SLUG}-git-${BRANCH_SLUG}-${TEAM_SLUG}.vercel.app"
-        echo "  (constructed branch alias from branch name)"
-      fi
-    fi
-
-    # Method 3: scan vercel ls for a non-hash URL on this branch
+    # Method 2: scan vercel ls for a -git- alias on this project (most recent preview)
     if [[ -z "$ALIAS_URL" ]]; then
       ALIAS_URL=$(vercel ls --cwd "$CWD" 2>&1 \
         | grep -Eo 'https://[a-zA-Z0-9-]+-git-[a-zA-Z0-9-]+-[a-zA-Z0-9-]+\.vercel\.app' \
