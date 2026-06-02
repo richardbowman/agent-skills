@@ -156,6 +156,29 @@ done
 
 ---
 
+## Find a project from a domain
+
+If you know a `*.vercel.app` URL (or any custom domain) but not the project name, use `vercel inspect` to reverse-lookup the project:
+
+```bash
+vercel inspect https://your-alias.vercel.app
+```
+
+The output shows the **project name**, deployment ID, all aliases assigned to it, and the team scope. This works on any alias — including custom `v0-*` domains, branch aliases, and per-deploy hash URLs.
+
+```
+> Fetched deployment "v0-app-abc123-team.vercel.app" in rv-bankrate-projects
+  name    v0-my-project-name
+  id      dpl_abc123...
+  Aliases
+    ╶ https://your-alias.vercel.app
+    ╶ https://v0-my-project-name.vercel.app
+```
+
+Use when: a stakeholder shares a URL and you need to find the project in the Vercel dashboard, or when an alias doesn't match the obvious project name.
+
+---
+
 ## Get the latest deployment URL
 
 ```bash
