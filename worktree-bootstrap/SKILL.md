@@ -140,3 +140,7 @@ Do NOT force-delete branches with no PR, CLOSED PRs, or anything unconfirmed.
 ### Notes
 - Squash-merge workflows often leave branches that `git branch -d` considers unmerged even though GitHub shows MERGED — use `-D` after confirming via `gh pr list`.
 - Remote branches are not deleted. Run `git remote prune origin` to also clean stale remote-tracking refs.
+
+
+> [!NOTE] Voice Note: 2026-06-04T10:59:30.387Z
+> Test change
