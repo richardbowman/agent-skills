@@ -2,6 +2,7 @@
 name: worktree
 description: Manage git worktrees for local Next.js development — bootstrap a fresh worktree (install deps, copy .env.local, start Postgres, inject DATABASE_URL) and clean up stale worktrees and merged branches. Use when entering a fresh worktree, when `nextdev start` fails, or when asked to tidy up branches after a sprint.
 ---
+<!-- test change for vault bridges PR feature -->
 
 # Worktree Management
 

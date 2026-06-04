@@ -181,12 +181,60 @@ Use when: a stakeholder shares a URL and you need to find the project in the Ver
 
 ## Get the latest deployment URL
 
+**⚠️ NEVER construct or guess Vercel preview URLs.** The pattern varies per project and alias. Always fetch from the API. Guessed URLs will return 404.
+
 ```bash
 # Latest preview:
 vercel ls --cwd $MAIN_REPO 2>&1 | grep "Preview" | head -1 | awk '{print $3}'
 
 # Latest production:
 vercel ls --cwd $MAIN_REPO 2>&1 | grep "Production" | head -1 | awk '{print $3}'
+```
+
+---
+
+## Get branch alias URLs for multiple PRs (bulk lookup)
+
+Use the Vercel REST API — do NOT construct URLs from branch names. The alias format is not predictable from the branch name alone.
+
+```bash
+MAIN_REPO=$HOME/projects/golden-wealth-app
+
+# Read auth + project info
+TOKEN=$(python3 -c "import json,os; print(json.load(open(os.path.expanduser('~/Library/Application Support/com.vercel.cli/auth.json')))['token'])")
+PROJECT_ID=$(python3 -c "import json; print(json.load(open('$MAIN_REPO/.vercel/project.json'))['projectId'])")
+TEAM_ID=$(python3 -c "import json; print(json.load(open('$MAIN_REPO/.vercel/project.json'))['orgId'])")
+
+# List all ready preview deployments with their stable branch alias URLs:
+curl -s "https://api.vercel.com/v6/deployments?projectId=${PROJECT_ID}&teamId=${TEAM_ID}&target=preview&state=READY&limit=50" \
+  -H "Authorization: Bearer $TOKEN" | \
+  python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+for d in data.get('deployments', []):
+    branch = d.get('meta', {}).get('githubCommitRef', 'unknown')
+    aliases = d.get('aliases', [])
+    # prefer branch alias (contains 'git-') over hash alias
+    best = next((a for a in aliases if 'git-' in a), aliases[0] if aliases else d.get('url', ''))
+    print(f'{branch}: https://{best}')
+" | sort
+```
+
+To look up a specific branch:
+```bash
+curl -s "https://api.vercel.com/v6/deployments?projectId=${PROJECT_ID}&teamId=${TEAM_ID}&target=preview&state=READY&limit=50" \
+  -H "Authorization: Bearer $TOKEN" | \
+  python3 -c "
+import json, sys
+branch_filter = 'feat/my-branch'   # <-- change this
+data = json.load(sys.stdin)
+for d in data.get('deployments', []):
+    if d.get('meta', {}).get('githubCommitRef') == branch_filter:
+        aliases = d.get('aliases', [])
+        best = next((a for a in aliases if 'git-' in a), aliases[0] if aliases else d.get('url', ''))
+        print(f'https://{best}')
+        break
+"
 ```
 
 ---
