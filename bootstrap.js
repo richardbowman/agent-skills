@@ -1,20 +1,40 @@
 #!/usr/bin/env node
-// bootstrap.js — symlink all skills and hooks from this repo into ~/.claude/
-// Run from the repo root: node bootstrap.js
+// bootstrap.js — symlink all skills, hooks, and CLI tools from this repo
+// into ~/.claude/ and ~/.local/bin/. Run from the repo root: node bootstrap.js
+//
+// Idempotent. Also registers .githooks/ as this repo's git hooksPath so a
+// post-merge hook re-runs bootstrap after every pull — new or renamed skills
+// and tools are linked without anyone having to remember this script exists.
 
 'use strict';
 
 const fs   = require('node:fs');
 const path = require('node:path');
 const os   = require('node:os');
+const { execSync } = require('node:child_process');
 
 const REPO       = path.dirname(fs.realpathSync(__filename));
 const CLAUDE     = path.join(os.homedir(), '.claude');
 const SKILLS_DST = path.join(CLAUDE, 'skills');
 const HOOKS_DST  = path.join(CLAUDE, 'hooks');
+const BIN_DST    = path.join(os.homedir(), '.local', 'bin');
+
+// CLI tools to expose on PATH, repo-relative. Entry-point wrappers only —
+// implementation files they resolve themselves (e.g. *.ts) don't belong here.
+const BIN_TOOLS = [
+  'nextjs-local-dev/nextdev',
+  'vercel-tools/vercel-wait-deploy',
+  'worktree-bootstrap/worktree-bootstrap',
+  'worktree-bootstrap/wtadd',
+  'worktree-bootstrap/wtcc',
+  'worktree-bootstrap/wtcc-recover',
+  'worktree-bootstrap/wtcc-status',
+  'worktree-bootstrap/wtpr',
+];
 
 fs.mkdirSync(SKILLS_DST, { recursive: true });
 fs.mkdirSync(HOOKS_DST,  { recursive: true });
+fs.mkdirSync(BIN_DST,    { recursive: true });
 
 function link(src, dst) {
   let existing = null;
@@ -83,6 +103,43 @@ if (fs.existsSync(HOOKS_SRC)) {
 }
 if (hookCount === 0) console.log('  (none)');
 
+// Link CLI tools into ~/.local/bin
+console.log('');
+console.log(`==> bin tools → ${BIN_DST}`);
+let binCount = 0;
+for (const rel of BIN_TOOLS) {
+  const src = path.join(REPO, rel);
+  if (!fs.existsSync(src)) { console.log(`  miss   ${rel}  (not in repo — update BIN_TOOLS?)`); continue; }
+  fs.chmodSync(src, 0o755);
+  link(src, path.join(BIN_DST, path.basename(rel)));
+  binCount++;
+}
+
+// Prune stale bin symlinks pointing into this repo (renamed/deleted tools)
+const binNames = new Set(BIN_TOOLS.map(rel => path.basename(rel)));
+for (const name of fs.readdirSync(BIN_DST)) {
+  const dst = path.join(BIN_DST, name);
+  let st;
+  try { st = fs.lstatSync(dst); } catch { continue; }
+  if (!st.isSymbolicLink()) continue;
+  const target = fs.readlinkSync(dst);
+  if (!target.startsWith(REPO + path.sep)) continue;
+  if (!fs.existsSync(target) || !binNames.has(name)) {
+    console.log(`  prune  ${name}  (-> ${target})`);
+    fs.unlinkSync(dst);
+  }
+}
+
+// Register .githooks/ so post-merge re-runs bootstrap after every pull
+try {
+  execSync('git config core.hooksPath .githooks', { cwd: REPO, stdio: 'pipe' });
+  console.log('');
+  console.log('==> git core.hooksPath = .githooks (bootstrap re-runs on every pull)');
+} catch {
+  console.log('');
+  console.log('==> skipped git hooksPath setup (not a git checkout?)');
+}
+
 // Prune stale symlinks that pointed into this repo but were renamed/deleted or excluded
 console.log('');
 for (const name of fs.readdirSync(SKILLS_DST)) {
@@ -102,4 +159,4 @@ for (const name of fs.readdirSync(SKILLS_DST)) {
 }
 
 console.log('');
-console.log(`==> Done — ${count} skills, ${hookCount} hooks linked into ${CLAUDE}`);
+console.log(`==> Done — ${count} skills, ${hookCount} hooks, ${binCount} bin tools linked`);

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Re-run bootstrap after every pull/merge so new or renamed skills, hooks,
+# and bin tools get (re)linked without manual intervention.
+exec node "$(git rev-parse --show-toplevel)/bootstrap.js"
