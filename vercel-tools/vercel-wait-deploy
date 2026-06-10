@@ -1,2 +1,5 @@
 #!/usr/bin/env bash
-exec /opt/homebrew/bin/tsx "$(dirname "$0")/vercel-wait-deploy.ts" "$@"
+# Resolve symlinks (e.g. ~/.local/bin/vercel-wait-deploy) so the .ts is found
+# next to this script's real location, then run it with node's native TS support.
+SOURCE=$(readlink -f "$0")
+exec node "$(dirname "$SOURCE")/vercel-wait-deploy.ts" "$@"
