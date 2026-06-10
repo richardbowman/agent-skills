@@ -18,13 +18,20 @@ These rules exist because in past sessions the assistant has killed every node p
 - If `nextdev` says a pid "no longer looks like node/next", **stop** and report it to the user — don't force-kill. Something unexpected is using that pid.
 - If you need to kill a server you didn't start with `nextdev`, confirm with the user first and target the single pid precisely (`kill <pid>`), never a pattern.
 
+## CRITICAL — never hardcode a port
+
+- **NEVER** pass `--port 3000` (or any port) to `nextdev start` unless the user explicitly asks for a specific port.
+- Port 3000 is almost always already in use. Hardcoding it causes an immediate failure.
+- Always run `nextdev start` with **no `--port` flag** — it scans for a free port automatically and prints the URL.
+- After `nextdev start`, read the `url:` line in the output to get the actual port. Do not assume 3000.
+
 ## Commands
 
 All commands operate on the instance keyed by `$(pwd -P)` unless noted.
 
 ```sh
-nextdev start              # auto-detect pnpm/yarn/bun/npm, pick free port ≥ 3000
-nextdev start --port 3001  # pin port (fails if in use)
+nextdev start              # auto-detect pnpm/yarn/bun/npm; picks a free port (do NOT add --port unless user asks)
+nextdev start --port 3001  # pin a specific port (fails immediately if already in use — avoid this)
 nextdev start --pm pnpm    # force package manager
 nextdev start --cmd "pnpm dev --turbopack"  # custom command
 
@@ -48,18 +55,20 @@ State lives in `${XDG_STATE_HOME:-~/.local/state}/nextdev/<hash-of-cwd>/` — on
 ```sh
 # main checkout
 cd ~/code/hiptrip
-nextdev start                        # → :3000
+nextdev start                        # picks first free port ≥ 3000, prints url:
 
 # feature branch in a worktree
 git worktree add ../hiptrip-feat-x feat/x
 cd ../hiptrip-feat-x
-nextdev start                        # → :3001 (auto-picked)
+nextdev start                        # picks next free port automatically
 
 nextdev list
 # STATE       PID     PORT    CWD
-# running     12345   3000    /home/rick/code/hiptrip
-# running     12399   3001    /home/rick/code/hiptrip-feat-x
+# running     12345   3002    /home/rick/code/hiptrip
+# running     12399   3003    /home/rick/code/hiptrip-feat-x
 ```
+
+The ports shown in `nextdev start` output and `nextdev list` are the source of truth — never guess or hardcode them.
 
 Each worktree has its own `.next/` build cache and its own `nextdev` instance — no interference.
 
