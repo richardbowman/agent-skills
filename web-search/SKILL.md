@@ -20,7 +20,7 @@ Use this skill whenever the user asks to:
 Use `Bash` to invoke the `web-search` script:
 
 ```bash
-~/GitHub/claude-config/bin/web-search "your query"
+~/claude-config/bin/web-search "your query"
 ```
 
 ### Options
@@ -36,23 +36,25 @@ Use `Bash` to invoke the `web-search` script:
 
 ```bash
 # General search
-~/GitHub/claude-config/bin/web-search "Andrej Karpathy LLM Wiki"
+~/claude-config/bin/web-search "Andrej Karpathy LLM Wiki"
 
 # Site-specific
-~/GitHub/claude-config/bin/web-search "Claude Code WebSearch Bedrock" --site docs.anthropic.com
+~/claude-config/bin/web-search "Claude Code WebSearch Bedrock" --site docs.anthropic.com
 
 # Fewer results for a quick lookup
-~/GitHub/claude-config/bin/web-search "what is Exa search API" --num 3
+~/claude-config/bin/web-search "what is Exa search API" --num 3
 
 # Get next page
-~/GitHub/claude-config/bin/web-search "platform engineering tools 2025" --start 11
+~/claude-config/bin/web-search "platform engineering tools 2025" --start 11
 ```
 
 ## Workflow
 
 1. Run `web-search` with the user's query
 2. Review the returned titles, URLs, and snippets
-3. Use `WebFetch` on the most relevant URLs to read full content
+3. Fetch full content from the most relevant URLs:
+   - Use `WebFetch` for simple static pages (docs, blogs, plain HTML)
+   - Use `agent-browser` for e-commerce/retail sites, JS-heavy pages, or anything that returns a 403/CAPTCHA/empty shell via WebFetch
 4. Answer the user based on what you fetched
 
 ## Setup Status
