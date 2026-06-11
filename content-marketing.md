@@ -1,118 +1,98 @@
-# Content Marketing Skill — Golden Wealth
+# Content Marketing Skill
 
-Use this skill whenever the user asks to write a blog post, add a landing page, audit content, or execute against the Golden Wealth content calendar.
+Use this skill whenever the user asks to write a blog post, add an SEO landing page, audit content, or execute against a content calendar for a web project.
 
----
-
-## Project context
-
-- **Repo:** `~/projects/golden-wealth-app`
-- **Active worktree:** check with `git worktree list` — content work lives on the `content-marketing` branch
-- **Strategy doc:** `marketing/content-marketing-strategy.md` — read this if you need the full content calendar, keyword targets, or KPI framework
-- **Target audience:** Upper-middle-class families ($80k–$200k HHI), ages 40–60, homeowners with kids. NOT ultra-high-net-worth. NOT lawyers or advisors. Avoid luxury/legacy framing. Write for people who are procrastinating, not people who have it figured out.
+This skill is **project-agnostic**. All project-specific facts (audience, voice, pillars, file paths, content calendar) live in a per-repo config file. The skill carries only the method.
 
 ---
 
-## Voice & tone
+## Step 0 — Load the project config (always do this first)
 
-- **Direct and practical.** No fluff. Every sentence earns its place.
-- **Warm but not hand-holdy.** Treat the reader as a capable adult who just hasn't gotten around to this yet.
-- **Specific over vague.** "You could lose $40,000 to probate fees" beats "this can be costly."
-- **No jargon without explanation.** Define "probate," "intestate," "TOD" the first time they appear.
-- **Never use:** "legacy," "wealth transfer," "high-net-worth," "ultra-wealthy," "generational wealth" (too formal/aspirational for our audience)
-- **Do use:** "family," "your kids," "when something happens," "get organized," "protect your family"
+Before writing anything, locate and read the project's content config:
 
----
+1. Look for `marketing/content-marketing-config.md` in the current repo (fall back to repo root `content-marketing-config.md`).
+2. If found, read it. It defines: repo/branch, target audience, voice & tone, the pillar → CTA → feature map, file locations, and a pointer to the full strategy/calendar doc. **Treat its values as authoritative — they override any defaults in this skill.**
+3. If **not** found, do not guess project specifics. Offer to scaffold one by interviewing the user (see "Scaffolding a config" below), or ask them to point you at an existing strategy doc.
 
-## Content pillars & CTA mapping
-
-| Pillar | TypeScript value | Typical CTA | Maps to |
-|---|---|---|---|
-| Estate Preparedness | `preparedness` | Take the free quiz | Quiz, panic moment |
-| Document & Asset Organization | `organization` | Get started free / Vault | Document Vault |
-| Wills & Legal Basics | `legal` | Start your will free | AI Will Builder |
-| Family Wealth Conversations | `family` | Get started free | Family Access, shared planning |
-| News & Law Updates | `news` | Get started free | General awareness / sign up |
-
----
-
-## Content calendar (remaining backlog)
-
-The full queue lives in `marketing/content-marketing-strategy.md` — always read that file for the current state. Target cadence is 2 posts per week. Take the next unwritten slug from the "Queue — write next" table in order.
+Everything below is the generic method. Wherever it references a path, a pillar, or a voice rule, use the value from the config.
 
 ---
 
 ## Workflow: writing a new blog post
 
 ### Step 1 — Pick the post
-If the user didn't specify, take the next unwritten item from the calendar above (in month order).
+If the user didn't specify, take the next unwritten item from the config's calendar/strategy doc, in queue order.
 
 ### Step 2 — Write the markdown body
-- File location: `content/blog/<slug>.md`
-- **Body only — no frontmatter, no YAML header.** Start directly with a `# Title` heading.
-- Target 1,200–1,800 words. Longer is fine for high-intent posts (legal pillar).
-- Structure: intro → 2–4 H2 sections → conclusion with CTA mention
-- Embed 1–2 internal links naturally (e.g. link "estate planning checklist" to `/estate-planning-checklist`)
-- End with a soft CTA paragraph pointing to the product feature that matches the pillar
+- File location: the blog markdown path from the config (e.g. `content/blog/<slug>.md`).
+- Honor the config's frontmatter convention. Many setups want **body only — no YAML header** — start directly with a `# Title` heading. Confirm against the config.
+- Target length: follow the config; absent guidance, 1,200–1,800 words (longer for high-intent/legal posts).
+- Structure: intro → 2–4 H2 sections → conclusion with a CTA mention.
+- Embed 1–2 internal links naturally to valid routes.
+- End with a soft CTA paragraph pointing to the product feature that matches the post's pillar (per the config's pillar → CTA → feature map).
 
-**For monthly law roundups** (`news` pillar, slug `law-updates-YYYY-MM`):
-- Title: "Estate Planning Law Updates: [Month] [Year]"
-- Cover 3–5 actual or plausible recent developments: federal legislation, IRS rule changes, SECURE Act updates, state probate law changes, court rulings affecting estate planning
-- Format: short intro → one H2 per item with a 2–3 paragraph explainer → "What this means for your family" closing
-- Keep it practical — explain what each change means for an average family, not legal jargon
-- ~1,000 words is sufficient; these are news-format, not deep guides
+**For recurring news/law roundups** (if the config defines a `news`-style pillar): short intro → one H2 per item with a 2–3 paragraph plain-language explainer → "what this means for you/your family" closing. ~1,000 words is enough; these are news-format, not deep guides.
 
-### Step 3 — Register in lib/blog.ts
-Add an entry to the `POSTS` array in `lib/blog.ts`:
-```ts
-{
-  slug: 'your-slug',
-  title: 'Full Title Here',
-  description: 'One-sentence meta description, 140–160 chars, written for search.',
-  publishedAt: 'YYYY-MM-DD',  // use today's date or scheduled date
-  author: 'Golden Wealth Team',
-  tags: ['tag1', 'tag2', 'tag3'],  // 3–5 lowercase tags
-  pillar: 'legal',  // one of: preparedness | organization | legal | family
-}
-```
-Append to the array — order doesn't matter, `getAllPosts()` sorts by date.
+### Step 3 — Register the post
+If the config specifies a blog registry (e.g. `lib/blog.ts`), add an entry matching the existing schema there (slug, title, description, publishedAt, author, tags, pillar, …). Read an existing entry first and mirror its exact shape — do not invent fields.
 
 ### Step 4 — Verify
-- Read the file back and confirm no frontmatter crept in
-- Check the slug matches between the filename, the `POSTS` entry, and any internal links
+- Read the file back; confirm the frontmatter convention was honored.
+- Confirm the slug matches across the filename, the registry entry, and any internal links.
 
 ---
 
 ## Workflow: adding a landing page
 
-Landing pages live at `app/<slug>/page.tsx`. They are Server Components with:
-- `export const metadata: Metadata` with title, description, canonical URL, openGraph
-- `MarketingNav` + `MarketingFooter` from `@/components/marketing/marketing-nav`
-- A hero section with H1, subhead, and primary CTA button
-- 3–5 content sections (checklist, features, FAQ, or stats)
-- `QuizCtaSection` or a signup CTA near the bottom
-- No `'use client'` — these are static pages
-
-Existing examples: `app/estate-planning-checklist/page.tsx`, `app/what-happens-without-a-will/page.tsx`
-
-After creating the page, add it to `app/sitemap.ts` if it's not already listed.
+Follow the config's landing-page location and component conventions. Read an existing example page named in the config and mirror its structure (metadata export, nav/footer components, hero, content sections, CTA section, client/server boundary). After creating the page, add it to the sitemap if the config names one.
 
 ---
 
 ## Workflow: content audit
 
 When asked to audit, check:
-1. All posts in `lib/blog.ts` have matching `.md` files in `content/blog/`
-2. All `.md` files are registered in `lib/blog.ts`
-3. `publishedAt` dates are not in the future (unless intentionally scheduled)
-4. Each post has a description between 140–160 characters
-5. `app/sitemap.ts` includes all blog posts and landing pages
-6. Internal links in markdown point to valid routes
+1. Every registry entry has a matching markdown file.
+2. Every markdown file is registered.
+3. `publishedAt` dates aren't unintentionally in the future.
+4. Each post's meta description fits the config's length target (commonly 140–160 chars).
+5. The sitemap includes all blog posts and landing pages.
+6. Internal links in markdown point to valid routes.
 
 ---
 
-## Key file locations
+## Scaffolding a config (when none exists)
 
+Interview the user one section at a time (mirrors the `pm-setup` pattern), then write `marketing/content-marketing-config.md` using the template below. Don't dump all questions at once.
+
+Ask about:
+1. **Project basics** — repo path, working branch for content, link to the strategy/calendar doc.
+2. **Audience** — who you're writing for, and explicitly who you're *not*.
+3. **Voice & tone** — house rules, plus "never use" / "do use" word lists.
+4. **Pillars** — each content pillar, its code value (if used in a registry), typical CTA, and the product feature it maps to.
+5. **File locations** — blog markdown dir, blog registry, blog index/post pages, SEO landing page dir, sitemap, any partner-docs paths.
+
+### Config template
+
+```markdown
+# Content Marketing Config — <Project Name>
+
+## Project context
+- **Repo:** `~/projects/<repo>`
+- **Content branch:** <branch> (check `git worktree list`)
+- **Strategy / calendar doc:** `<path>` — read for the full calendar, keywords, KPIs
+- **Target audience:** <who, including who it is NOT>
+
+## Voice & tone
+- <house rules>
+- **Never use:** <words/phrases>
+- **Do use:** <words/phrases>
+
+## Pillars & CTA mapping
+| Pillar | Registry value | Typical CTA | Maps to feature |
+|---|---|---|---|
+| … | … | … | … |
+
+## File locations
 | What | Where |
 |---|---|
 | Blog markdown | `content/blog/<slug>.md` |
@@ -121,6 +101,8 @@ When asked to audit, check:
 | Blog post page | `app/blog/[slug]/page.tsx` |
 | SEO landing pages | `app/<slug>/page.tsx` |
 | Sitemap | `app/sitemap.ts` |
-| Partner docs markdown | `content/partner-docs/<slug>.md` |
-| Partner docs registry | `lib/partner-docs.ts` |
-| Content strategy | `marketing/content-marketing-strategy.md` |
+| Strategy / calendar | `marketing/content-marketing-strategy.md` |
+
+## Frontmatter convention
+- <e.g. body only, no YAML; or list required frontmatter fields>
+```
