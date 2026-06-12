@@ -189,6 +189,18 @@ vercel ls --cwd $MAIN_REPO 2>&1 | grep "Preview" | head -1 | awk '{print $3}'
 vercel ls --cwd $MAIN_REPO 2>&1 | grep "Production" | head -1 | awk '{print $3}'
 ```
 
+**IMPORTANT: The URL returned by `vercel ls` is the Vercel-generated hash URL (e.g., `project-abc123xyz-team.vercel.app`). To get the PRODUCTION CUSTOM DOMAIN, you MUST inspect the deployment:**
+
+```bash
+# Get production deployment URL
+PROD_URL=$(vercel ls --prod 2>&1 | grep "Production" | head -1 | awk '{print $3}')
+
+# Inspect to get custom domain aliases
+vercel inspect "$PROD_URL" 2>&1 | grep -A 10 "Aliases"
+```
+
+The `Aliases` section shows ALL URLs for this deployment, including custom domains like `consumer-experience.bankrate-prototypes.com`. **Always report the custom domain to the user, not the hash URL.**
+
 ---
 
 ## Wait for a deployment to go Ready
