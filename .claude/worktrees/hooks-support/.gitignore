@@ -1,0 +1,4 @@
+# Personal/local preferences — never commit these
+**/local-preferences.md
+**/.env
+**/.env.local
