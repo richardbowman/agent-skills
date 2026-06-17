@@ -1,0 +1,6 @@
+{
+  "name": "agent-skills",
+  "displayName": "Agent Skills",
+  "description": "General-purpose Claude Code agent skills",
+  "skills": "."
+}
