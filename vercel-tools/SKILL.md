@@ -167,7 +167,7 @@ vercel inspect https://your-alias.vercel.app
 The output shows the **project name**, deployment ID, all aliases assigned to it, and the team scope. This works on any alias — including custom `v0-*` domains, branch aliases, and per-deploy hash URLs.
 
 ```
-> Fetched deployment "v0-app-abc123-team.vercel.app" in rv-bankrate-projects
+> Fetched deployment "v0-app-abc123-team.vercel.app" in your-vercel-team
   name    v0-my-project-name
   id      dpl_abc123...
   Aliases
@@ -199,7 +199,7 @@ PROD_URL=$(vercel ls --prod 2>&1 | grep "Production" | head -1 | awk '{print $3}
 vercel inspect "$PROD_URL" 2>&1 | grep -A 10 "Aliases"
 ```
 
-The `Aliases` section shows ALL URLs for this deployment, including custom domains like `consumer-experience.bankrate-prototypes.com`. **Always report the custom domain to the user, not the hash URL.**
+The `Aliases` section shows ALL URLs for this deployment, including custom domains like `my-app.example.com`. **Always report the custom domain to the user, not the hash URL.**
 
 ---
 
@@ -261,7 +261,7 @@ When a deployment fails, use `vercel inspect` with `--logs` to see the full buil
 npx vercel inspect dpl_<DEPLOYMENT_ID> --logs --scope <SCOPE_NAME>
 
 # Example:
-npx vercel inspect dpl_Aix3L5sBTVQMRt3qM9wKkEbtYLUD --logs --scope rv-bankrate-projects
+npx vercel inspect dpl_Aix3L5sBTVQMRt3qM9wKkEbtYLUD --logs --scope your-vercel-team
 
 # Pipe to tail for last N lines (error usually at the end):
 npx vercel inspect dpl_<ID> --logs --scope <SCOPE> 2>&1 | tail -100

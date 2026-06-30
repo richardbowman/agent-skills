@@ -18,7 +18,7 @@ Scaffolds a complete Aurora DSQL + Prisma 7 integration for Next.js projects on 
 The fastest path is cloning the starter repo directly:
 
 ```bash
-npx create-next-app --example https://github.com/bankrate-prototypes/v0-prisma-dsql-starter my-app
+npx create-next-app --example https://github.com/your-org/v0-prisma-dsql-starter my-app
 ```
 
 Then customize `PGSCHEMA` in your Vercel environment variables (see Step 4 below).
@@ -365,6 +365,6 @@ export async function POST(req: Request) {
 
 ## Reference
 
-- Starter repo: https://github.com/bankrate-prototypes/v0-prisma-dsql-starter
+- Starter repo: https://github.com/your-org/v0-prisma-dsql-starter
 - Full guide: `/guide` route on any deployment, or download the MDX via `/api/guide`
-- Raw guide source: https://github.com/bankrate-prototypes/v0-prisma-dsql-starter/blob/main/features/guide/guide-content.mdx
+- Raw guide source: https://github.com/your-org/v0-prisma-dsql-starter/blob/main/features/guide/guide-content.mdx
