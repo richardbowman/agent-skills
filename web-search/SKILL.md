@@ -1,11 +1,11 @@
 ---
 name: web-search
-description: Search the web using Google Custom Search via the bankrate-workspace-cli GCP project. Use when the user asks to search the web, look something up, find current information, or research a topic. Works on AWS Bedrock (unlike the native WebSearch tool).
+description: Search the web using Google Custom Search JSON API. Use when the user asks to search the web, look something up, find current information, or research a topic. Works on AWS Bedrock (unlike the native WebSearch tool).
 ---
 
 # Web Search
 
-Search the web via Google Custom Search JSON API, backed by the `bankrate-workspace-cli` GCP project.
+Search the web via Google Custom Search JSON API, backed by your GCP project.
 
 ## When to Use
 
@@ -72,7 +72,7 @@ The script uses your existing `gws` OAuth credentials — no separate API key ne
 > The `cse` scope needs to be added to your gws token. Ask Claude to run `gws auth login` with the consolidated scope list from your GWS OAuth Scopes memory note, plus `https://www.googleapis.com/auth/cse`.
 
 **First-time setup checklist:**
-1. Enable Custom Search API → https://console.cloud.google.com/apis/library/customsearch.googleapis.com?project=bankrate-workspace-cli
+1. Enable Custom Search API → https://console.cloud.google.com/apis/library/customsearch.googleapis.com (select your GCP project)
 2. Create Programmable Search Engine → https://programmablesearchengine.google.com/ (entire web)
 3. Add `export GOOGLE_SEARCH_CX="..."` to `~/.zshrc`
 4. Re-auth gws with `cse` scope added (one-time, requires user confirmation)
@@ -80,6 +80,6 @@ The script uses your existing `gws` OAuth credentials — no separate API key ne
 ## Limits & Cost
 
 - Free tier: **100 queries/day** (Google Custom Search JSON API)
-- Paid: $5 per 1,000 queries beyond free tier, billed to `bankrate-workspace-cli`
+- Paid: $5 per 1,000 queries beyond free tier, billed to your GCP project
 - Results: up to 10 per call; paginate with `--start` for more
 - No separate API key — uses existing `gws` OAuth refresh token

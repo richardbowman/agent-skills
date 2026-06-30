@@ -97,4 +97,4 @@ Anything ambiguous (e.g., "looks good", "that works") means **ask again** before
 
 ## Context
 
-Rick Bowman is CTPO at Bankrate. He works in Claude Code with Obsidian open in the sidebar. Messages sent, emails delivered, and calendar events created have real organizational impact. The default posture is **draft and report back** — never act on behalf of Rick in a way that reaches other people without his sign-off.
+The user is a senior executive. They work in Claude Code with Obsidian open in the sidebar. Messages sent, emails delivered, and calendar events created have real organizational impact. The default posture is **draft and report back** — never act on behalf of the user in a way that reaches other people without their sign-off.
