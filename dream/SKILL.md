@@ -69,14 +69,17 @@ FRICTION_PATTERNS = [
     r"\bactually[,\.]", r"\bwait[,\.]", r"\bhold on\b",
     r"that'?s not", r"not what i", r"didn'?t want", r"don'?t want",
     r"why did you", r"why are you",
+    r"doesn'?t (seem|look|feel) right", r"this (is|isn'?t) (weird|off|odd|broken)",
+    r"not quite", r"close,? but", r"still (not|doesn'?t|isn'?t|wrong)",
+    r"that'?s backwards", r"undo (that|this)", r"put (it|that) back",
     # Frustration
-    r"\bugh\b", r"\bargh\b", r"\bffs\b",
-    r"you keep", r"again you", r"still (doing|not|wrong)",
-    r"i (told|said|asked) you",
+    r"\bugh\b", r"\bargh\b", r"\bffs\b", r"[\U0001F604-\U0001FAFF]",
+    r"you keep", r"again you", r"i (told|said|asked) you( already)?",
+    r"for the (second|third|\d+)(nd|rd|th)? time",
     # Redirects
     r"\bstop (doing|that|this)\b", r"never mind", r"nevermind",
     r"forget (it|that|this)", r"revert (that|this|it)",
-    r"please don'?t", r"don'?t do that",
+    r"please don'?t", r"don'?t do that", r"try again",
     # Explicit rule declarations (high-value signals)
     r"from now on", r"always\b.{0,30}(do|use|run|check|make)",
     r"\bnever\b.{0,30}(do|use|run|add|create)",
@@ -86,13 +89,55 @@ FRICTION_PATTERNS = [
 ]
 
 # --- Praise patterns (to capture what's working) ---
+# NOTE: bare words like "exactly" or "perfect" are too common in ordinary
+# technical writing ("not exactly", "exactly the same bug") to use alone —
+# anchor them to an affirmation construction instead.
 PRAISE_PATTERNS = [
-    r"\bperfect\b", r"\bexactly\b", r"love (it|this|that)",
-    r"that'?s (exactly|what i wanted|right|it|perfect)",
-    r"(nice|great|good) (job|work|call|catch|one)",
-    r"that (works|worked|did it)",
+    r"that'?s (exactly|perfect|it|right)\b", r"exactly (right|what i (wanted|needed|meant))",
+    r"^exactly[.!]?$", r"\bperfect[.!]", r"love (it|this|that)",
+    r"(nice|great|good|awesome|fantastic) (job|work|call|catch|one)",
+    r"that (works|worked|did it)", r"nailed it",
     r"\byes!?\b.{0,20}(that|this|perfect|exactly)",
 ]
+
+# --- Fingerprints of Claude-authored dispatch text (NOT the user's own words) ---
+# These show up as role:"user" in logs — Agent-tool task briefs, Workflow/skill
+# dispatch messages, subagent voter prompts — but Rick never typed them.
+ORCHESTRATION_MARKERS = [
+    "## task procedure", "you are implementing", "you're implementing",
+    "you are executing", "you're executing", "you are working in the git worktree",
+    "the worktree is already set up at", "git worktree at `",
+    "working directory (the git worktree)", "use todowrite to create a task list",
+    "use taskcreate to create a task list", "end-to-end verification of every requirement",
+]
+SYNTHETIC_PREFIXES = [
+    "Summarize this conversation",
+    "This session is being continued",
+    "Summary:\n",
+    "The conversation above",
+    "<task-notification>",
+    "## Adversarial Claim Verifier",
+    "## Synthesis:",
+    "## Judge",
+    'Run the "',  # Workflow/skill dispatch, e.g. Run the "deep-research" workflow.
+    "You are updating an existing conversation summary with new messages.",
+    "Below is a conversation transcript",  # tab-title / metadata generation prompts
+    "You are helping fork a conversation into a new, self-contained thread",
+]
+
+def extract_text(content):
+    """User message content can be a plain string OR a list of content blocks
+    (the normal chat-UI format is a list). Pull text out of either shape —
+    missing the list case silently drops the vast majority of real messages."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text":
+                parts.append(block.get("text", ""))
+        return "\n".join(parts)
+    return ""
 
 friction_compiled = [(re.compile(p, re.IGNORECASE), p) for p in FRICTION_PATTERNS]
 praise_compiled = [(re.compile(p, re.IGNORECASE), p) for p in PRAISE_PATTERNS]
@@ -102,6 +147,9 @@ praise_hits = []
 files_scanned = 0
 
 for path in sorted(glob.glob(f"{LOGS_DIR}/**/*.jsonl", recursive=True)):
+    # Nested subagent transcripts are Claude-to-Claude, never Rick — skip entirely.
+    if "/subagents/" in path:
+        continue
     try:
         mtime = os.path.getmtime(path)
         if mtime < last_run.timestamp():
@@ -119,19 +167,22 @@ for path in sorted(glob.glob(f"{LOGS_DIR}/**/*.jsonl", recursive=True)):
                 obj = json.loads(line)
                 if obj.get("type") != "user":
                     continue
-                content = obj.get("message", {}).get("content", "")
-                if not isinstance(content, str) or len(content.strip()) < 8:
+                content = extract_text(obj.get("message", {}).get("content"))
+                if len(content.strip()) < 8:
                     continue
-                # Skip pure tool result messages
+                # Skip pure tool result / JSON payload messages
                 if content.startswith("{") or content.startswith("["):
                     continue
-                # Skip system-injected messages (hook summaries, context continuations)
-                if any(content.startswith(prefix) for prefix in [
-                    "Summarize this conversation",
-                    "This session is being continued",
-                    "Summary:\n",
-                    "The conversation above",
-                ]):
+                # Skip system-injected and workflow/agent-dispatch messages —
+                # these are Claude's own words routed through a user-role turn.
+                if any(content.startswith(prefix) for prefix in SYNTHETIC_PREFIXES):
+                    continue
+                content_lower = content.lower()
+                if any(marker in content_lower for marker in ORCHESTRATION_MARKERS):
+                    continue
+                # Catch-all: long, multi-section text reads as a written brief,
+                # not something Rick typed in chat.
+                if len(content) > 600 and content.count("\n## ") >= 2:
                     continue
 
                 ts = obj.get("timestamp", "")[:10]
@@ -353,3 +404,12 @@ echo "Dream complete. Next run in ~24h."
 - "Hmm" with no follow-up correction
 
 **When multiple signals cluster into one theme:** write one feedback file covering the theme, not one per signal.
+
+---
+
+## Known scanner pitfalls (fixed 2026-07-01 — keep these in mind if you touch Phase 2)
+
+- **User message content is usually a list of blocks, not a plain string.** The normal chat-UI format is `content: [{"type": "text", "text": "..."}]`. A filter like `isinstance(content, str)` silently discards nearly every real message and leaves only the rare plain-string ones — which are almost always Claude-authored dispatch text, not Rick's words. Always extract text from both shapes (see `extract_text()`).
+- **Agent/Workflow dispatch text gets logged with `role: "user"`.** Task briefs Claude writes to spawn an engineer/agent ("You are implementing...", "## Task Procedure", worktree paths), Workflow-tool dispatch lines ("Run the \"...\" workflow"), and internal voter/judge prompts ("## Adversarial Claim Verifier") all show up as user turns in the JSONL but Rick never typed them. Filter these out by fingerprint (`ORCHESTRATION_MARKERS`/`SYNTHETIC_PREFIXES`) and by a length+header heuristic, or they'll dominate the friction/praise output and drown out real signal.
+- **Nested subagent transcripts live under `<session>/subagents/*.jsonl`.** The recursive glob picks these up too — they're Claude-to-Claude, exclude the whole path.
+- If a dream run's friction/praise counts are dominated by task-brief-looking text (long, multi-heading, worktree paths), that's a sign the filters above have gone stale against a new dispatch template — update the fingerprint lists rather than the results.
