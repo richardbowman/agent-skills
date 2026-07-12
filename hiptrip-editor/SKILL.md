@@ -147,7 +147,11 @@ Example: vibe=9, auth=10, scene=8, visual=7, unique=9, value=9 → round((9×.20
 
 ### Search for places
 
-Start with `radiusMeters: 3000–5000`. If a place you know belongs in the destination doesn't appear, **widen to 10000 and search again** — don't flag it as a gap and stop. Resolve it.
+Results are ranked by **distance from the search center**, not popularity — so the `location` string and `radiusMeters` you pick directly control what surfaces. Geocoding resolves neighborhood names to genuinely distinct coordinates (confirmed: "Bywater, New Orleans" and "Faubourg Marigny, New Orleans" geocode to different points a few hundred meters apart, not the city centroid) — use that.
+
+- **City-wide first pass**: `radiusMeters: 3000–5000` from `"<City>, <Country>"`. Fine for an initial sweep, but a city-center search will still favor whatever's closest to the center — it won't surface outer neighborhoods on its own.
+- **Neighborhood-targeted pass** (do this for any city with distinct hip neighborhoods — most cities worth curating have them): `radiusMeters: 1500–2500`, and set `location` to the neighborhood itself, e.g. `"Bywater, New Orleans, Louisiana, USA"` rather than just `"New Orleans, Louisiana, USA"`. Run one pass per neighborhood per category. This is what actually surfaces local, non-famous spots instead of the same handful of city-wide landmarks appearing in every category.
+- If a place you know belongs in the destination doesn't appear, **widen to 10000 and search again** — don't flag it as a gap and stop. Resolve it.
 
 ```bash
 curl -s -X POST "$BASE/api/editor/agent/search/nearby" \
@@ -159,6 +163,20 @@ curl -s -X POST "$BASE/api/editor/agent/search/nearby" \
     "radiusMeters": 3000,
     "maxResults": 10
   }' | jq '.places[] | {name, googleRating, ratingCount, priceLevel, editorialSummary}'
+```
+
+For a neighborhood pass, same call with a narrower radius and the neighborhood in `location`:
+
+```bash
+curl -s -X POST "$BASE/api/editor/agent/search/nearby" \
+  -H "x-editor-agent-secret: $SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "location": "Bywater, New Orleans, Louisiana, USA",
+    "category": "Coffee Shop",
+    "radiusMeters": 2000,
+    "maxResults": 10
+  }' | jq '.places[] | {name, address, googleRating, ratingCount, priceLevel}'
 ```
 
 Valid `category` values: Coffee Shop, Dinner Spots, Bar / Nightlife, Brunch, Cocktail Bar, Wine Bar, Bakery, Street Food, Shopping, Museum, Hotel, Spa & Wellness.
