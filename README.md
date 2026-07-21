@@ -36,7 +36,6 @@ This symlinks every skill directory into `~/.claude/skills/` and every hook scri
 | `production-readiness` | Production readiness checklist and review |
 | `rb-personal-assistant` | Gmail triage, drafting, newsletters, travel planning |
 | `remotion-video-ads` | End-to-end Remotion video production — TTS, Whisper sync, landing page embed |
-| `roadmap-ship` | Mark roadmap items as shipped after merging |
 | `task-triage` | Task and issue triage workflows |
 | `vercel-tools` | Vercel CLI recipes — migrations, deployments, logs |
 | `verify-before-coding` | Verify fast-moving APIs before writing code |
