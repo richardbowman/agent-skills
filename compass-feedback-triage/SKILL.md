@@ -76,9 +76,24 @@ After processing all items, report:
 - Items closed as noise (list them).
 - Any items skipped or that errored.
 
+If this run took any real action (not the "queue already empty" no-op), follow the same
+outcome-note + daily-note-link convention `compass-resolver` uses (see that skill's Step 9)
+so triage runs are visible in the vault too: write a short note to
+`~/Documents/Personal/Products/Compass/Runs/<workspace-slug>-YYYY-MM-DD-triage.md` and link
+it under today's daily note's `## Claude Sessions` section.
+
 ## Pairing with compass-resolver
 
 This skill only triages — it does not implement anything. Schedule it to run shortly
 *before* the `compass-resolver` cron job (e.g. an hour earlier) so freshly triaged
 NEXT/EXPLORING work has a chance to be manually promoted to NOW, or so `compass-resolver`'s
 feedback-fallback tier has fresh, well-formed opportunities to pull from if NOW is empty.
+
+`compass-resolver` now also backfills NOW itself: if NOW is empty when it runs, it scans
+the items this skill has already promoted to NEXT and — if any of them are well-defined
+enough to implement without a product decision — promotes exactly one to NOW itself (with
+a distinct `⬆️` marker, not `🤖`) and stops without implementing, notifying via the vault
+note above so a human can glance at it before the next run implements it. That's a
+resolver-side decision (see its Step 1 tier 5 and its own well-defined checklist); this
+skill's job is unchanged — keep the OPEN queue empty and feed NEXT with well-formed
+opportunities, nothing more.
