@@ -36,6 +36,7 @@ This symlinks every skill directory into `~/.claude/skills/` and every hook scri
 | `production-readiness` | Production readiness checklist and review |
 | `rb-personal-assistant` | Gmail triage, drafting, newsletters, travel planning |
 | `remotion-video-ads` | End-to-end Remotion video production — TTS, Whisper sync, landing page embed |
+| `roadmap-ship` | Mark roadmap items as shipped after merging |
 | `task-triage` | Task and issue triage workflows |
 | `vercel-tools` | Vercel CLI recipes — migrations, deployments, logs |
 | `verify-before-coding` | Verify fast-moving APIs before writing code |
@@ -50,19 +51,6 @@ Scripts in `hooks/` are symlinked into `~/.claude/hooks/` by `bootstrap.js`. The
 | Hook | Event | Purpose |
 |---|---|---|
 | `require-worktree.sh` | `PreToolUse` (Edit/Write) | Blocks edits to `~/projects/` unless you're in a linked git worktree |
-
-## Excluding skills on a specific machine
-
-Create a `.exclude` file in the repo root (gitignored — machine-local only). One skill name per line, `#` for comments:
-
-```
-# Not relevant on this machine
-hiptrip-editor
-youtube-watch-history-organizer
-backup-vercel-secrets
-```
-
-`bootstrap.js` reads this on every run — excluded skills are skipped during linking and any existing symlinks are removed. The skills stay in the repo and are available on other machines.
 
 ## Adding a skill
 
