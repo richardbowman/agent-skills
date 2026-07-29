@@ -239,6 +239,15 @@ Options:
 
 On success, prints the stable **branch alias URL** (e.g. `https://v0-app-git-my-branch-team.vercel.app`) and writes it to `/tmp/vercel_prod_url.txt`. Falls back to the per-deploy hash URL if no alias is found.
 
+**"Auth error (stale token)" even though `vercel whoami`/`vercel ls` work fine:** the Vercel CLI uses
+short-lived OAuth access tokens (`~/Library/Application Support/com.vercel.cli/auth.json` — `token` +
+`refreshToken` + `expiresAt`). Any `vercel` CLI command transparently refreshes an expired/near-expired
+token and rewrites that file. `vercel-wait-deploy` now does the same: it checks `expiresAt` before
+polling and on every 401/403 mid-poll, forcing a refresh via `vercel whoami` and re-reading the file —
+so a stale cached token self-heals instead of failing the whole wait. If it still fails after that,
+the token itself is genuinely invalid and `vercel login` is required (this also breaks the CLI itself,
+so `vercel whoami` failing is the tell).
+
 ---
 
 ## Full merge-to-prod workflow
