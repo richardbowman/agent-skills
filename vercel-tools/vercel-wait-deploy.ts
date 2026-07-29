@@ -61,19 +61,79 @@ function readVercelProject(): VercelProjectJson {
   }
 }
 
-// ── Read Vercel auth token ───────────────────────────────────────────────────
+// ── Vercel auth (with automatic refresh) ─────────────────────────────────────
+//
+// The Vercel CLI (v40+) uses short-lived OAuth access tokens plus a
+// refreshToken and expiresAt (unix seconds), stored in auth.json. Any `vercel`
+// CLI invocation (e.g. `vercel whoami`, `vercel ls`) transparently refreshes
+// an expired/near-expired token and rewrites auth.json. This script used to
+// read the token out of auth.json once and hold onto it for the whole poll
+// (up to --timeout, default 600s) — bypassing that refresh entirely. That's
+// why the CLI itself works fine (`vercel whoami`/`vercel ls`) while this
+// script fails with a stale/expired token. Fix: force a refresh through the
+// CLI (which owns the refresh-token exchange) whenever the cached token is
+// near expiry or gets rejected, then re-read the file.
 
-function readVercelToken(): string {
-  const authPath = join(
-    process.env.HOME ?? "",
-    "Library/Application Support/com.vercel.cli/auth.json"
-  );
+interface VercelAuth {
+  token: string;
+  refreshToken?: string;
+  expiresAt?: number; // unix seconds
+}
+
+const AUTH_PATH = join(
+  process.env.HOME ?? "",
+  "Library/Application Support/com.vercel.cli/auth.json"
+);
+
+function loadVercelAuth(): VercelAuth {
   try {
-    const auth = JSON.parse(readFileSync(authPath, "utf-8")) as { token: string };
-    return auth.token;
+    return JSON.parse(readFileSync(AUTH_PATH, "utf-8")) as VercelAuth;
   } catch {
     console.error("Error: could not read Vercel auth token. Run 'vercel login' first.");
     process.exit(1);
+  }
+}
+
+function refreshVercelAuth(): VercelAuth {
+  const result = spawnSync("vercel", ["whoami"], { encoding: "utf-8" });
+  if (result.status !== 0) {
+    console.error("Error: Vercel CLI re-authentication failed. Run 'vercel login' first.");
+    if (result.stderr) console.error(result.stderr.trim());
+    if (result.stdout) console.error(result.stdout.trim());
+    process.exit(1);
+  }
+  return loadVercelAuth();
+}
+
+const TOKEN_REFRESH_BUFFER_SECS = 120;
+
+class VercelTokenManager {
+  private auth: VercelAuth;
+
+  constructor() {
+    this.auth = loadVercelAuth();
+    this.refreshIfNearExpiry();
+  }
+
+  private refreshIfNearExpiry() {
+    const { expiresAt } = this.auth;
+    if (!expiresAt) return;
+    const nowSecs = Math.floor(Date.now() / 1000);
+    if (expiresAt - nowSecs <= TOKEN_REFRESH_BUFFER_SECS) {
+      console.log("Vercel CLI token expiring/expired — refreshing via `vercel whoami`...");
+      this.auth = refreshVercelAuth();
+    }
+  }
+
+  get(): string {
+    return this.auth.token;
+  }
+
+  /** Force a refresh (e.g. after a 401/403 mid-poll) and return the new token. */
+  forceRefresh(): string {
+    console.log("Vercel API rejected the current token — refreshing via `vercel whoami`...");
+    this.auth = refreshVercelAuth();
+    return this.auth.token;
   }
 }
 
@@ -151,10 +211,24 @@ interface VercelDeploymentsResponse {
   deployments: VercelDeployment[];
 }
 
-async function fetchVercel<T>(path: string, token: string, teamId: string): Promise<T> {
+async function fetchVercel<T>(
+  path: string,
+  tokenManager: VercelTokenManager,
+  teamId: string
+): Promise<T> {
   const sep = path.includes("?") ? "&" : "?";
   const url = `https://api.vercel.com${path}${sep}teamId=${teamId}`;
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  const doFetch = (token: string) =>
+    fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+
+  let res = await doFetch(tokenManager.get());
+  if (res.status === 401 || res.status === 403) {
+    // Cached token was rejected (e.g. expired mid-poll) — refresh through the
+    // CLI (which owns the refresh-token exchange) and retry once.
+    const freshToken = tokenManager.forceRefresh();
+    res = await doFetch(freshToken);
+  }
+
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`Vercel API ${res.status} — ${path}\n${text.slice(0, 200)}`);
@@ -165,13 +239,13 @@ async function fetchVercel<T>(path: string, token: string, teamId: string): Prom
 async function findDeployment(
   projectId: string,
   teamId: string,
-  token: string,
+  tokenManager: VercelTokenManager,
   sha: string,
   targetEnv: string
 ): Promise<VercelDeployment | null> {
   const data = await fetchVercel<VercelDeploymentsResponse>(
     `/v6/deployments?projectId=${projectId}&limit=20`,
-    token,
+    tokenManager,
     teamId
   );
 
@@ -189,16 +263,16 @@ async function findDeployment(
 async function getDeployment(
   deploymentId: string,
   teamId: string,
-  token: string
+  tokenManager: VercelTokenManager
 ): Promise<VercelDeployment> {
-  return fetchVercel<VercelDeployment>(`/v13/deployments/${deploymentId}`, token, teamId);
+  return fetchVercel<VercelDeployment>(`/v13/deployments/${deploymentId}`, tokenManager, teamId);
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
   const { projectId, orgId: teamId } = readVercelProject();
-  const token = readVercelToken();
+  const tokenManager = new VercelTokenManager();
   const sha = resolvesha();
 
   console.log(`Waiting for deployment of ${sha.slice(0, 8)} in project ${projectId} (target: ${target}) ...`);
@@ -208,7 +282,7 @@ async function main() {
   // Step 1: wait for the deployment record to appear
   let deployment: VercelDeployment | null = null;
   while (true) {
-    deployment = await findDeployment(projectId, teamId, token, sha, target!);
+    deployment = await findDeployment(projectId, teamId, tokenManager, sha, target!);
     if (deployment) {
       console.log(`Found deployment: ${deployment.uid} (${deployment.state})`);
       break;
@@ -224,7 +298,7 @@ async function main() {
 
   // Step 2: poll until READY or ERROR
   while (true) {
-    const dep = await getDeployment(deployment.uid, teamId, token);
+    const dep = await getDeployment(deployment.uid, teamId, tokenManager);
     // v13 single-deployment endpoint uses readyState (state is absent)
     const depState = dep.readyState ?? dep.state ?? dep.status ?? "unknown";
     console.log(`  status: ${depState}`);
