@@ -1,103 +1,33 @@
 ---
 name: rb-personal-assistant
-description: Personal assistant skill for Gmail triage, drafting responses, scanning newsletters for interests, and preparing trip reports. Owns the full scheduled Gmail inbox-triage procedure (including the Obsidian "Email Action Items" Base). Use when managing email or automating travel/dev workflows.
+description: Personal assistant skill for Gmail triage, drafting responses, scanning newsletters for interests, and preparing trip reports. Use when managing email or automating travel/dev workflows.
 ---
 
 # RB Personal Assistant
 
-This skill lets an AI assistant (Claude or Gemini) act as a proactive assistant for Rick's Gmail inbox and professional workflows. It is the single source of truth for the inbox-triage procedure — the scheduled cron job simply invokes this skill, so keep the full logic here rather than duplicating it in the cron prompt.
+This skill enables Gemini CLI to act as a proactive assistant for the user's Gmail inbox and professional workflows.
 
----
+## Core Workflows
 
-## Gmail Inbox Triage — Full Procedure
+### 1. Inbox Triage & Newsletter Scanning
+Use `gws gmail +triage` to scan unread messages.
+- **Newsletters**: Scan content (WBEZ, Block Club, etc.) for interesting snippets (Chicago news, tech trends, wellness).
+- **Categorization**: Sort into Action Required, News (to summarize), and Noise.
 
-Run this whenever asked to triage the inbox, including scheduled/unattended runs. Use the `gws` CLI (already on PATH). Work the steps in order.
+### 2. Handling Junk & Routine Alerts
+- **Tech Alerts**: Archive (remove INBOX label) routine TestFlight, GitHub, and Vercel successes unless they indicate a Production/Billing/Security issue.
+- **Home Notices**: Move emails from the Condominium Association to a "Home" label or archive if no action is needed.
 
-**Key constants**
-- **Jarvis archive label:** `Label_9220311120338883160` — to archive, add this label AND remove `INBOX` in the same `modify` call.
-- **Inbox scan query:** `gws gmail +triage --query 'is:unread label:INBOX' --max 60`
-- **Context notes:** `/Users/rickbowman/Documents/Personal/Jarvis Summaries/triage-context.md`
-- **Action Items folder:** `/Users/rickbowman/Documents/Personal/Jarvis Summaries/Action Items/`
-- **Action Items Base** (already exists — never recreate): `/Users/rickbowman/Documents/Personal/Jarvis Summaries/Email Action Items.base`
-- **Summaries folder:** `/Users/rickbowman/Documents/Personal/Jarvis Summaries/`
-- **Daily notes:** `/Users/rickbowman/Documents/Personal/Daily/<YYYY-MM-DD>.md`
-- **gws caveat:** label parameters must be plain strings, not arrays — e.g. `addLabelIds: "Label_9220311120338883160"`, `removeLabelIds: "INBOX"`.
-
-### STEP 0 — Read context notes
-Read the context-notes file. These are notes from Rick about things he has already handled or wants treated differently this run — factor them into every decision below. After the run, remove any notes you acted on (edit the Pending Notes section). If a note should become a permanent rule, add it to `references/preferences.md` instead of leaving it in the context file.
-
-### STEP 0b — Deduplicate against prior runs AND the Action Items Base
-1. `ls "/Users/rickbowman/Documents/Personal/Jarvis Summaries/Triage-$(date +%Y-%m-%d)"*.md 2>/dev/null` — if any exist, read them and extract every subject/sender already under **Action Required** and every newsletter already under **Newsletter Highlights**.
-2. `ls "/Users/rickbowman/Documents/Personal/Jarvis Summaries/Action Items/"` and, for any email you are about to flag, check for an existing tracking note by Gmail id: `grep -rl "gmail_id: <ID>" "/Users/rickbowman/Documents/Personal/Jarvis Summaries/Action Items/"`.
-
-If something was already reported today, or already has an open action-item note, do not repeat it in the summary and do not create a duplicate note — only update the existing note (STEP 5b), unless there is genuinely new information (a reply, an update, a different email on the same topic).
-
-### STEP 1 — Scan unread messages
-Run the inbox scan query above. (Note: plain `gws gmail +triage` with no query defaults to `is:unread` across the whole mailbox, capped at 20 — it misses the real inbox backlog because already-archived-but-still-unread mail crowds out true inbox items. Always pass the explicit `label:INBOX` query so this scans the actual inbox.)
-
-### STEP 2 — Archive routine noise
-Archive (jarvis label + remove INBOX): TestFlight / GitHub / Vercel successes, Experian promos, TaxSlayer, Google Security Alerts for known accounts. Also archive newsletters after summarizing their highlights (STEP 4) — do not leave them in the inbox.
-
-### STEP 3 — Building / condo notices
-Move Condominium Association / building emails to the **Home** label.
-
-### STEP 4 — Newsletters
-Scan newsletters (WBEZ, Block Club, City Cast, etc.) for snippets matching Rick's interests: smoked meats, bread, cycling, home automation, Linux, SW Michigan local, Costa Rica / Portugal travel (full interest map in `references/preferences.md`). Summarize any hits, then archive the newsletter (jarvis label). SKIP any newsletter already summarized today (STEP 0b) — just archive it silently.
-
-### STEP 5 — Flag Action Required
-Flag: invoices from priority contacts, production / billing / security alerts, compliance / attestation deadlines, appointment prep, and paid opportunities. Skip anything the context notes say Rick already handled. SKIP anything already reported today or already tracked by an open action-item note (STEP 0b), unless there is genuinely new information. Pure shipping / tracking notifications ("your order has shipped") are reported once, then archived.
-
-### STEP 5b — Maintain the Action Items Base
-For each item flagged in STEP 5, ensure it is tracked as a note in the Action Items folder so it appears in the **Email Action Items** Base. The Base file already exists — do NOT recreate it.
-
-- **Dedup on `gmail_id`** (STEP 0b). If a note with that id exists: only update `last_run` (and `last_seen`) to the current run — do NOT overwrite `status` (Rick manages it manually) and do NOT duplicate. If the existing note's status is `Done` or `Dismissed`, leave it closed; do not reopen or re-flag it.
-- **If no note exists, create one.** Filename: `<Sender> - <short subject>.md` (strip filename-invalid characters: `/ \ :` etc.). Frontmatter schema:
-
-```yaml
----
-type: email-action
-status: Open            # Open | In Progress | Done | Dismissed  (Rick edits this in Obsidian)
-priority: High          # High | Medium | Low
-priority_rank: 1        # 1=High, 2=Medium, 3=Low  (drives sort order)
-category: Billing       # Billing | Invoice | Security | Compliance | CI/CD | Account | Benefits | Appointment | Opportunity | Solar | SEO | Other
-sender: "Vercel"
-subject: "..."
-email_date: YYYY-MM-DD  # date the email was received
-due_date:               # optional; only if the email states a due date
-gmail_id: <hex id from gws>
-gmail_link: https://mail.google.com/mail/u/0/#all/<hex id>
-first_seen: YYYY-MM-DD  # today
-last_run: YYYY-MM-DD-HH-MM
----
-```
-
-Body: an H1 `# <Sender> — <subject>`, a 1–2 sentence description of the action needed, and a `**[Open in Gmail](<gmail_link>)**` line. The `gmail_link` hex id is the same hex message/thread id `gws` returns — it is Gmail's web permalink.
-
-- **Assign priority sensibly:** High = money at risk / production down / hard deadline (billing failures, overdue payments, security breaches, compliance attestations); Medium = needs a decision or reply soon (invoices, CI failures, account setup, appointments, paid opportunities); Low = informational but actionable (statements, SEO audits, marketing nudges).
-
-### STEP 6 — Travel hold
-Do NOT archive travel emails (Marriott, AC Hotels, UPS, airlines) until the trip is confirmed over. See Travel & Trip Reporting below.
-
-### STEP 7 — Write the triage summary
-Write to `/Users/rickbowman/Documents/Personal/Jarvis Summaries/Triage-<YYYY-MM-DD-HH-MM>.md` with sections: **Action Required**, **Newsletter Highlights**, **Archived**. Under Action Required, note that items are also tracked in the [[Jarvis Summaries/Email Action Items.base|Email Action Items]] Base. If nothing new was found, write a brief "No new items since last run" note and stop.
-
-### STEP 8 — Link in the daily note
-Add a wikilink to the summary file in `/Users/rickbowman/Documents/Personal/Daily/<YYYY-MM-DD>.md` under a `## Claude Sessions` section (create the section if missing).
-
-> Scheduled/unattended runs: complete STEP 0–8 and stop — no need to post the summary anywhere else.
-
----
-
-## Travel & Trip Reporting
+### 3. Travel & Trip Reporting
 - **Identify**: Track hotel (Marriott, AC Hotels), flight, and shipping (UPS) emails.
-- **Workflow**: (Future) Check the calendar to correlate these into a single "Trip Report".
-- **Action**: Do not archive travel receipts / info until the trip has concluded.
+- **Workflow**: (Future) Check Outlook Calendar to correlate these emails into a single "Trip Report".
+- **Action**: Do not archive travel receipts/info until the trip has concluded.
 
-## Response Protocol
-- **Priority Contacts**: (e.g. HVAC contractor) Draft short, polite responses to invoices or inquiries.
-- **Safety**: Never authorize payments or click financial links without explicit confirmation from Rick.
+### 4. Response Protocol
+- **Priority Contacts**: (e.g., HVAC contractor) Draft short, polite responses to invoices or inquiries.
+- **Safety**: Never authorize payments or click financial links without explicit confirmation.
 
-## Creating Gmail Drafts (with or without attachments)
+### 5. Creating Gmail Drafts (with or without attachments)
 
 The `gws` CLI cannot handle large payloads as command-line arguments. Use the Python recipe below instead, which decrypts the gws credentials directly and calls the Gmail API.
 
@@ -149,10 +79,10 @@ for path, name in [('/path/to/file.png', 'file.png')]:
 **Note:** `cryptography` must be installed (`pip3 install cryptography`). The token from `gws auth export` is not an access token — always refresh via the recipe above.
 
 ## Command Reference
-- **Scan inbox**: `gws gmail +triage --query 'is:unread label:INBOX' --max 60`
+- **Triage**: `gws gmail +triage`
 - **Read & Scan**: `gws gmail users messages get --params '{"userId": "me", "id": "ID"}'`
 - **Move to Label**: `gws gmail users messages modify --params '{"userId": "me", "id": "ID", "addLabelIds": "LABEL", "removeLabelIds": "INBOX"}'`
-- **Archive**: `gws gmail users messages modify --params '{"userId": "me", "id": "ID", "addLabelIds": "Label_9220311120338883160", "removeLabelIds": "INBOX"}'`
+- **Archive**: `gws gmail users messages modify --params '{"userId": "me", "id": "ID", "removeLabelIds": "INBOX"}'`
 
 ## Preferences Reference
 See [references/preferences.md](references/preferences.md) for detailed interest mapping and contact rules.
