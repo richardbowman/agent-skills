@@ -32,6 +32,17 @@ Read the context-notes file. These are notes from Rick about things he has alrea
 
 If something was already reported today, or already has an open action-item note, do not repeat it in the summary and do not create a duplicate note — only update the existing note (STEP 5b), unless there is genuinely new information (a reply, an update, a different email on the same topic).
 
+### STEP 0c — Process pending Base actions
+The Action Items Base has an `archive` checkbox column (Rick ticks it in Obsidian). Before scanning the inbox, sweep for pending actions:
+
+1. `grep -l "^archive: true" "/Users/rickbowman/Documents/Personal/Jarvis Summaries/Action Items/"*.md` (also match `archive: true` without the caret in case of indentation differences).
+2. For each match, read the note's frontmatter. Skip it if `status` is already `Done` or `Dismissed` (already processed on a prior run — nothing to do).
+3. Otherwise archive the underlying email: `gws gmail users messages modify --params '{"userId": "me", "id": "<gmail_id>", "addLabelIds": "Label_9220311120338883160", "removeLabelIds": "INBOX"}'`.
+4. On success, update the note's frontmatter: set `status: Dismissed` and `last_run` to now. Leave `archive: true` in place as the record of the action — do not uncheck it.
+5. On failure (e.g. message already deleted), leave `status` as-is, do not retry endlessly, and note the failure under a **Errors** line in this run's triage summary (STEP 7) so Rick sees it.
+
+This step is the only thing that closes the loop on the checkbox — checking it in Obsidian does nothing to the actual Gmail message until the next scheduled triage run picks it up (every 6h, 07:00-22:00).
+
 ### STEP 1 — Scan unread messages
 Run the inbox scan query above. (Note: plain `gws gmail +triage` with no query defaults to `is:unread` across the whole mailbox, capped at 20 — it misses the real inbox backlog because already-archived-but-still-unread mail crowds out true inbox items. Always pass the explicit `label:INBOX` query so this scans the actual inbox.)
 
@@ -57,6 +68,7 @@ For each item flagged in STEP 5, ensure it is tracked as a note in the Action It
 ---
 type: email-action
 status: Open            # Open | In Progress | Done | Dismissed  (Rick edits this in Obsidian)
+archive: false          # Rick checks this box in the Base to archive the email + close the item (STEP 0c)
 priority: High          # High | Medium | Low
 priority_rank: 1        # 1=High, 2=Medium, 3=Low  (drives sort order)
 category: Billing       # Billing | Invoice | Security | Compliance | CI/CD | Account | Benefits | Appointment | Opportunity | Solar | SEO | Other
@@ -79,7 +91,7 @@ Body: an H1 `# <Sender> — <subject>`, a 1–2 sentence description of the acti
 Do NOT archive travel emails (Marriott, AC Hotels, UPS, airlines) until the trip is confirmed over. See Travel & Trip Reporting below.
 
 ### STEP 7 — Write the triage summary
-Write to `/Users/rickbowman/Documents/Personal/Jarvis Summaries/Triage-<YYYY-MM-DD-HH-MM>.md` with sections: **Action Required**, **Newsletter Highlights**, **Archived**. Under Action Required, note that items are also tracked in the [[Jarvis Summaries/Email Action Items.base|Email Action Items]] Base. If nothing new was found, write a brief "No new items since last run" note and stop.
+Write to `/Users/rickbowman/Documents/Personal/Jarvis Summaries/Triage-<YYYY-MM-DD-HH-MM>.md` with sections: **Action Required**, **Newsletter Highlights**, **Archived**. Under Action Required, note that items are also tracked in the [[Jarvis Summaries/Email Action Items.base|Email Action Items]] Base. If STEP 0c processed any checkbox actions, add an **Archived via Base** line listing them, and an **Errors** line for any that failed. If nothing new was found, write a brief "No new items since last run" note and stop.
 
 ### STEP 8 — Link in the daily note
 Add a wikilink to the summary file in `/Users/rickbowman/Documents/Personal/Daily/<YYYY-MM-DD>.md` under a `## Claude Sessions` section (create the section if missing).
