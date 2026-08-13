@@ -201,6 +201,29 @@ available):
 If a visual regression is found, fix it before proceeding. Do not open a PR
 with a known visual bug and plan to fix it "later."
 
+**Write a QA report — do not skip this even if you're about to summarize in
+chat.** Chat summaries are invisible to the user when this skill runs inside
+a background subagent; a written report is the only durable record.
+
+1. Find or create today's per-run vault note:
+   `~/Documents/Personal/Products/<Project>/Runs/<project-slug>-<YYYY-MM-DD>-*.md`
+   (project name from the repo directory/`package.json`, capitalized —
+   e.g. `compass` → `Compass`). Append to today's note if one exists (most
+   recently modified if several); otherwise create
+   `...-<YYYY-MM-DD>-qa.md`.
+2. Append a `## QA Report — <HH:MM>` section listing, per viewport/mode
+   checked: pass/fail against the four bullets above, and what was actually
+   different if something failed and got fixed.
+3. **Embed real screenshots, not descriptions.** Save each one under
+   `~/Documents/Personal/Attachments/QA/<Project>/<YYYY-MM-DD>-<slug>/` and
+   embed it in the report with `![[Attachments/QA/<Project>/.../file.png]]`.
+   "Verified visually" with no attached image does not satisfy this step.
+4. If the vault folder is bridged to this repo, run the `vault-bridge` skill
+   to sync after writing.
+5. When you report completion of this checklist (to the user or to whoever
+   spawned you as a subagent), state the exact vault path of the report you
+   wrote — that path is the only proof the verification happened.
+
 ## Step 5 — Docs Review
 
 Docs location comes from `.claude/pr-guidelines.md` if present; otherwise
@@ -232,6 +255,9 @@ status for each item:
 - [ ] Unit tests: passing + new tests written
 - [ ] E2E tests: passing + new/updated tests written
 - [ ] Visual verification: desktop and mobile viewports checked (if UI touched)
+- [ ] QA report written to the vault run note with embedded screenshots (if
+      any tests were run or visual verification was performed) — state the
+      path
 - [ ] Docs: reviewed and updated for any changed user-facing behavior
 - [ ] Screenshots: regenerated and committed (if project has screenshot tooling)
 - [ ] Linear issue: moved to **In Review**
