@@ -23,7 +23,7 @@ This symlinks every skill directory into `~/.claude/skills/` and every hook scri
 | `brain-dump` | Structured knowledge extraction — Claude interviews you and saves to Obsidian |
 | `brainstorm` | Active ideation partner — angles, frameworks, structured Obsidian output |
 | `content-marketing` | Content strategy and marketing copy recipes |
-| `dream` | Memory consolidation — scans conversation logs, updates memory files, mines friction |
+| `dream` | Memory consolidation — scans conversation logs and agent-reported friction (see `log-friction`), updates memory files |
 | `dsql` | Build with Aurora DSQL — schemas, queries, DSQL-specific patterns |
 | `dsql-migrate` | Generate and apply Prisma migrations for Aurora DSQL |
 | `dsql-schema` | Validate Prisma schema for DSQL compatibility |
@@ -31,6 +31,7 @@ This symlinks every skill directory into `~/.claude/skills/` and every hook scri
 | `e2e-local` | Run Playwright E2E tests locally |
 | `find-docs` | Fetch up-to-date docs for any library or framework |
 | `hiptrip-editor` | HipTrip editorial agent — write trips, curate hip places, publish |
+| `log-friction` | Log agent-side operational friction (wrong turns, stale docs, wasted retries) for `dream` to consolidate |
 | `nextjs-local-dev` | Run/monitor Next.js dev servers via the `nextdev` CLI |
 | `podman-postgres` | Local Postgres via Podman |
 | `production-readiness` | Production readiness checklist and review |

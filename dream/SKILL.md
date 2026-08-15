@@ -18,6 +18,7 @@ Modeled on Anthropic's unreleased auto-dream feature, extended with a friction-m
 | `~/.claude/dream-last-run` | ISO-8601 UTC timestamp of last completed dream |
 | `~/.claude/projects/<project-slug>/memory/` | Per-project memory (feedback rules, project context) |
 | `~/.claude/skills/dream/scan.ts` | Canonical Phase 2 friction/praise scanner (Node/TS — see Phase 2) |
+| `~/.claude/friction-log.jsonl` | Agent-self-reported operational friction, appended via the `log-friction` skill — read directly in Phase 2a |
 | `~/Documents/Personal/Claude/dream-YYYY-MM-DD.md` | Dated run reports (also the carryover source — see Phase 1) |
 
 ---
@@ -33,6 +34,9 @@ echo "Last dream: $LAST_RUN"
 
 # Count conversation files
 find ~/.claude/projects -name "*.jsonl" | wc -l
+
+# Count agent-reported friction entries waiting to be read (see Phase 2a)
+wc -l ~/.claude/friction-log.jsonl 2>/dev/null || echo "0 (no friction-log.jsonl yet)"
 
 # List existing feedback files across all project memory dirs
 find ~/.claude/projects -path "*/memory/feedback_*.md" 2>/dev/null
@@ -81,7 +85,22 @@ To modify the scanner's filtering (new noise source, new pattern), edit `~/.clau
 
 ---
 
+## Phase 2a: AGENT-REPORTED FRICTION (structured, pre-qualified)
+
+Separate signal source from the transcript scan above: agents can self-report operational friction directly via the `log-friction` skill (`~/.claude/skills/log-friction/`), which appends to `~/.claude/friction-log.jsonl`. This is a different signal class than Phase 2's transcript mining — it's the agent's own account of what went wrong in *how it worked* (wrong turns, wasted retries, stale docs, tools that didn't match their docs), not Rick's reaction to the result. It doesn't need the noise filtering Phase 2.5 exists for, because it was written on purpose by an agent, not incidentally captured from a chat turn.
+
+```bash
+# No canonical script needed — this file is small enough to read directly.
+cat ~/.claude/friction-log.jsonl 2>/dev/null
+```
+
+Each line is one JSON object: `{ts, agent, project, summary, detail, severity, cwd}`. Keep only entries whose `ts` is after `$LAST_RUN` (same cursor as Phase 1). Treat every surviving entry as a **pre-qualified candidate** — skip Phase 2.5 for these, and carry them straight into Phase 3 alongside (not instead of) the transcript-mined hits. If `friction-log.jsonl` doesn't exist yet or has zero new entries, note that in the report and move on — it's expected to be sparse until agents adopt the habit.
+
+---
+
 ## Phase 2.5: CLASSIFY SURVIVORS (don't trust the regex alone)
+
+This phase applies only to Phase 2's transcript-mined hits — Phase 2a's agent-reported entries are already pre-qualified and skip straight to Phase 3.
 
 The regex/fingerprint filters in `scan.ts` are a cheap prefilter, not a verdict. They will always lag one step behind new dispatch templates (verified: there is no structural discriminator in the logs — cron dispatches, inter-thread relays, and real human messages all carry identical envelope fields `entrypoint='sdk-ts'` / `promptSource='sdk'` / `userType='external'`, so content is the only signal). Treat every hit the script prints as a **candidate**, not confirmed signal, and apply judgment before Phase 3:
 
@@ -104,7 +123,7 @@ After reading the friction and praise output, reason through it **before** writi
 
 ### 3a. Cross-reference against existing feedback — reinforcement is first-class
 
-For **every** surviving friction signal, first check: does it match a rule that already exists in a `feedback_*.md`? This is a required step, not optional — a signal that matches an existing rule is a *reinforcement*, not a new rule, and must never spawn a duplicate file.
+For **every** surviving friction signal — both the Phase 2.5 survivors and the Phase 2a agent-reported entries — first check: does it match a rule that already exists in a `feedback_*.md`? This is a required step, not optional — a signal that matches an existing rule is a *reinforcement*, not a new rule, and must never spawn a duplicate file.
 
 - **Match found → reinforcement.** The rule exists but was violated again. Note which file; you'll append a `Reinforced:` line in Phase 4b.
 - **Escalation trigger:** if a rule already carries **2 or more prior `Reinforced:` lines** (i.e. this run would be the 3rd+ time it's been violated), the rule is not working as passive memory. Flag it in the report for escalation — it should move up to the always-loaded layer (the relevant `CLAUDE.md`, project or global) instead of living only in a `feedback_*.md` that clearly isn't changing behavior. Surface this to Rick; don't just append another Reinforced line and move on.
@@ -209,6 +228,7 @@ Write to: `~/Documents/Personal/Claude/dream-${DATE}.md`
 ## Summary
 - Scanned N files across N projects
 - Found N friction signals, N praise signals (after Phase 2.5 filtering)
+- N agent-reported friction entries processed (Phase 2a)
 - Created N new feedback rules, merged N, archived N
 - Reinforced N existing rules (N flagged for escalation)
 
@@ -221,6 +241,8 @@ Write to: `~/Documents/Personal/Claude/dream-${DATE}.md`
 ## Consolidations & Archives
 ## Praise Patterns — Don't Regress These
 ## Friction Signal Log
+## Agent-Reported Friction (Phase 2a)
+<Each entry from friction-log.jsonl processed this run, and how it was handled — new rule, reinforcement, or discarded as too vague.>
 ## Open Items / Carry Forward
 <Anything unresolved this run — the NEXT run's carryover reads this section.>
 
@@ -270,3 +292,4 @@ echo "Dream complete. Next scheduled run: Sunday 21:00 (Weekly /dream cron), or 
 - **(2026-07-28) No structural discriminator exists — content is the only signal.** Verified on real logs: cron dispatches, inter-thread relays, and genuinely human-typed messages all carry identical envelope fields (`entrypoint='sdk-ts'`, `promptSource='sdk'`, `userType='external'`), because the Obsidian plugin routes everything through the same SDK path. Per-file human-turn-count also fails to separate them (the plugin fragments one conversation across many single-turn session files). So the regex prefilter + Phase 2.5 judgment pass is the right design; don't waste time re-attempting an envelope-field or turn-count classifier.
 - **(2026-07-28) Phase 2 is a checked-in script, not a heredoc.** The scanner used to be an embedded Python `<<PYEOF` heredoc, conflicting with the "never use Python" rule (every run either violated it or improvised an unverified reimplementation). Now `~/.claude/skills/dream/scan.ts`, run with `node`. Edit that file directly; don't reintroduce an inline copy.
 - **(2026-07-28) Age ≠ staleness — never auto-archive on the 90-day mark alone.** First real run of the age-check found 21 of 33 feedback files already >90 days by mtime, most being still-active standing rules (DSQL constraints, migration policy). Phase 1b/4d require independent evidence of staleness before archiving; surface ambiguous batches to Rick.
+- **(2026-08-14) Added Phase 2a — agent-reported friction.** New `log-friction` skill + `~/.claude/friction-log.jsonl` let agents self-report operational friction directly instead of relying solely on transcript mining, which only catches things Rick happened to comment on. Phase 2a entries skip Phase 2.5's classifier since they're intentionally authored, not incidentally captured from a chat turn. If this source stays empty run after run, the likely cause is agents not adopting the habit — check whether `log-friction`'s description is actually triggering proactive use, not whether the reader logic is broken.
