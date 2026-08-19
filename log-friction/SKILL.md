@@ -1,6 +1,6 @@
 ---
 name: log-friction
-description: Log a piece of agent-side operational friction (a wrong turn, wasted retry, stale doc, tool that didn't behave as documented, dead end, or missing capability) hit during any task. INVOKE PROACTIVELY the moment you hit friction worth remembering — don't wait for your final report, and don't wait to be asked. Feeds the `dream` skill's Phase 2a directly, so consolidation runs work from known problems instead of mining conversation transcripts for signals. Not for user-facing bugs or product issues — those go through normal reporting/Linear.
+description: Log a piece of agent-side operational friction (a wrong turn, wasted retry, stale doc, tool that didn't behave as documented, dead end, or missing capability) hit during any task. INVOKE PROACTIVELY the moment you hit friction worth remembering — don't wait for your final report, and don't wait to be asked. Feeds the separately installed `agent-dream` skill's Phase 2a directly, so consolidation runs work from known problems instead of mining conversation transcripts for signals. Not for user-facing bugs or product issues — those go through normal reporting/Linear.
 ---
 
 # Log Friction
@@ -21,7 +21,7 @@ Any of these, the moment it happens — not retroactively at the end of a task:
 - You wasted a non-trivial amount of time (multiple tool calls / a full retry cycle) before finding the real root cause.
 - You hit a missing capability and had to improvise a workaround.
 
-Skip it for: routine debugging with no real dead end, user preference corrections (the `dream` skill's transcript mining already catches those), and anything already covered by an existing `feedback_*.md` memory file you're already aware of.
+Skip it for: routine debugging with no real dead end, user preference corrections (the separately installed `agent-dream` skill's transcript mining already catches those), and anything already covered by an existing `feedback_*.md` memory file you're already aware of.
 
 ## How to invoke
 
@@ -40,9 +40,9 @@ This never blocks or asks for confirmation — it's a pure append, safe to call 
 
 ## What happens to logged entries
 
-The `dream` skill (run weekly or on demand) reads `${AGENT_STATE_HOME}/friction-log.jsonl` in Phase 2a, treats every entry as a pre-qualified signal, and folds it into the same pattern-analysis, deduplication, and feedback-file pipeline as transcript-mined signals. Repeated friction becomes a feedback rule or is escalated toward harness-level guidance.
+The separately installed [`agent-dream`](https://github.com/richardbowman/agent-dream) skill (run weekly or on demand) reads `${AGENT_STATE_HOME}/friction-log.jsonl` in Phase 2a, treats every entry as a pre-qualified signal, and folds it into the same pattern-analysis, deduplication, and feedback-file pipeline as transcript-mined signals. Repeated friction becomes a feedback rule or is escalated toward harness-level guidance.
 
 ## Design notes
 
 - Single global JSONL (`${AGENT_STATE_HOME}/friction-log.jsonl`), not per-project—every agent appends here regardless of repo. The `project` field supports later filtering.
-- Append-only, no rotation. `dream` filters by `ts` against its own last-run cursor (same pattern `scan.ts` uses for conversation transcripts), so old entries simply age out of future runs without needing to be deleted.
+- Append-only, no rotation. `agent-dream` filters by `ts` against its own last-run cursor, so old entries simply age out of future runs without needing to be deleted.

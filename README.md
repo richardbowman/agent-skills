@@ -23,7 +23,6 @@ This existing bootstrap installs only into Claude Code: it symlinks every skill 
 | `brain-dump` | Structured knowledge extraction — the assistant interviews you and saves to Obsidian |
 | `brainstorm` | Active ideation partner — angles, frameworks, structured Obsidian output |
 | `content-marketing` | Content strategy and marketing copy recipes |
-| `dream` | Memory consolidation — scans conversation logs and agent-reported friction (see `log-friction`), updates memory files |
 | `dsql` | Build with Aurora DSQL — schemas, queries, DSQL-specific patterns |
 | `dsql-migrate` | Generate and apply Prisma migrations for Aurora DSQL |
 | `dsql-schema` | Validate Prisma schema for DSQL compatibility |
@@ -31,7 +30,7 @@ This existing bootstrap installs only into Claude Code: it symlinks every skill 
 | `e2e-local` | Run Playwright E2E tests locally |
 | `find-docs` | Fetch up-to-date docs for any library or framework |
 | `hiptrip-editor` | HipTrip editorial agent — write trips, curate hip places, publish |
-| `log-friction` | Log agent-side operational friction (wrong turns, stale docs, wasted retries) for `dream` to consolidate |
+| `log-friction` | Log agent-side operational friction (wrong turns, stale docs, wasted retries) for the separately installed `agent-dream` skill to consolidate |
 | `nextjs-local-dev` | Run/monitor Next.js dev servers via the `nextdev` CLI |
 | `podman-postgres` | Local Postgres via Podman |
 | `production-readiness` | Production readiness checklist and review |
@@ -43,6 +42,8 @@ This existing bootstrap installs only into Claude Code: it symlinks every skill 
 | `video-storyboard` | Pre-production for Remotion videos — script workshop, scene breakdown, Obsidian storyboard doc |
 | `worktree-bootstrap` | Prep a git worktree for local Next.js dev |
 | `youtube-watch-history-organizer` | Organize YouTube watch history into Obsidian |
+
+The `dream` skill now lives in the standalone [agent-dream](https://github.com/richardbowman/agent-dream) repository and should be installed from that source.
 
 ## Hooks
 
