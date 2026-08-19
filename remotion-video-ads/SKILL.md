@@ -1,8 +1,17 @@
+---
+name: remotion-video-ads
+description: Build and verify production Remotion video ads from an approved storyboard, including narration, timing, compositions, and visual QA.
+---
+
 # Remotion Video Ads
 
-**Before starting:** Read this project's `CLAUDE.md` for the `## Remotion Video Ads` section. It contains the pattern assignment, composition paths, voice ID, brand tokens, asset paths, and package scripts. Do not proceed without it.
+## Harness portability
 
-Three production patterns — your project CLAUDE.md specifies which one applies:
+Use the active harness's shell, file, and image-inspection capabilities. Read project instructions from `AGENTS.md` or `CLAUDE.md`, preferring the harness-native file when both exist and reconciling conflicts explicitly. All storyboard, render, narration, and QA gates remain mandatory.
+
+**Before starting:** Read this project's `AGENTS.md` or `CLAUDE.md` for the `## Remotion Video Ads` section. It contains the pattern assignment, composition paths, voice ID, brand tokens, asset paths, and package scripts. Do not proceed without it.
+
+Three production patterns—the project's harness guidance specifies which one applies:
 
 | Pattern | TTS | Video | When to use |
 |---|---|---|---|
@@ -23,7 +32,7 @@ Three-act emotional story ads (9:16, 20–24s each), multiple concepts tested si
 Create `remotion/brand.ts` as a single source of truth. **Every composition and every generation script must import from here — never hardcode brand values.**
 
 ```ts
-// remotion/brand.ts — fill in values from your project CLAUDE.md
+// remotion/brand.ts — fill in values from project harness guidance
 export const BRAND = {
   url:       'your-domain.com',
   urlSpoken: 'your dash domain dot com',  // for ElevenLabs TTS — spell out punctuation
@@ -168,7 +177,7 @@ ffmpeg -y -i input.mp4 -c:v libx264 -profile:v baseline -level 3.1 \
 
 AI-generated video backgrounds (Veo) + ElevenLabs narration + ElevenLabs ambient music bed. Each ad covers one subject (destination, product story, etc.) in a 20–24s 9:16 format.
 
-See your project CLAUDE.md for composition paths, data source files, CLI conventions, and the narration script formula.
+See the project harness guidance for composition paths, data source files, CLI conventions, and the narration script formula.
 
 ---
 
@@ -230,10 +239,10 @@ npx tsx remotion/scripts/generate-narration.ts --subject <slug>
 
 - Model: `eleven_turbo_v2_5`
 - Settings: `stability: 0.4, similarity_boost: 0.8, style: 0.3, use_speaker_boost: true`
-- Voice ID: configure in your project CLAUDE.md
+- Voice ID: configure in the project harness guidance
 - Target: ~26 words -> ~10–11 seconds (fits a 12s CTA window)
 
-**Script formula:** configure in your project CLAUDE.md — it should include brand name, one insight line, and the CTA with a phonetically spelled URL.
+**Script formula:** configure in the project harness guidance—it should include brand name, one insight line, and the CTA with a phonetically spelled URL.
 
 No Whisper needed — narration plays in a single Sequence from `CTA_IN` to `TOTAL`. Verify actual duration with `afinfo` after generating; if it overruns the CTA window, trim the script and regenerate.
 
@@ -329,7 +338,7 @@ The opening hook is the most important line — it must create immediate emotion
 
 **Preferred: ElevenLabs `convertWithTimestamps`** — returns audio + character-level timing in one call. No Whisper needed.
 
-Voice ID: configure in your project CLAUDE.md.
+Voice ID: configure in the project harness guidance.
 
 ```ts
 import { ElevenLabsClient } from 'elevenlabs'
@@ -338,7 +347,7 @@ import fs from 'fs'
 const client = new ElevenLabsClient({ apiKey: process.env.ELEVENLABS_API_KEY })
 
 const response = await client.textToSpeech.convertWithTimestamps(
-  YOUR_VOICE_ID,  // from project CLAUDE.md
+  YOUR_VOICE_ID,  // from project harness guidance
   {
     text: SCRIPT,
     modelId: 'eleven_multilingual_v2',

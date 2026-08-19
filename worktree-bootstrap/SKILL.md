@@ -1,9 +1,13 @@
 ---
-name: worktree
+name: worktree-bootstrap
 description: Manage git worktrees for local Next.js development — bootstrap a fresh worktree (install deps, copy .env.local, start Postgres, inject DATABASE_URL) and clean up stale worktrees and merged branches. Use when entering a fresh worktree, when `nextdev start` fails, or when asked to tidy up branches after a sprint.
 ---
 
 # Worktree Management
+
+## Harness portability
+
+The `worktree-bootstrap` command and bootstrap/cleanup workflow are harness-neutral. `wtcc`, `wtcc-recover`, and `wtpr` are Claude-specific helpers because they launch Claude Code; Codex sessions must use their native worktree/session launcher instead. Never invoke a Claude-specific helper from Codex merely to satisfy this skill.
 
 ---
 

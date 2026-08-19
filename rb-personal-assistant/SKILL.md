@@ -5,6 +5,10 @@ description: Personal assistant skill for Gmail triage, drafting responses, scan
 
 # RB Personal Assistant
 
+## Harness portability
+
+Use the active harness's Gmail connector, secure-secret request, vault/file tools, and scheduler equivalents. If a required connector is unavailable, prepare a draft/report and identify the missing capability; never bypass the confirmation rules for sending email or changing external state. Existing `Claude Sessions` vault headings are retained as storage schema, not as a harness requirement.
+
 This skill lets an AI assistant (Claude or Gemini) act as a proactive assistant for Rick's Gmail inbox and professional workflows. It is the single source of truth for the inbox-triage procedure — the scheduled cron job simply invokes this skill, so keep the full logic here rather than duplicating it in the cron prompt.
 
 ---

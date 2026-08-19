@@ -1,6 +1,6 @@
 # agent-skills
 
-Agent skill library — hand-authored skills that extend AI coding agents (Claude Code, and compatible tools) with domain knowledge, recipes, and workflows.
+Agent skill library — hand-authored skills that extend AI coding agents with domain knowledge, recipes, and workflows. Skill content supports Claude Code and Codex where the portability section in that skill's `SKILL.md` says so.
 
 Companion to [claude-config](https://github.com/richardbowman/claude-config) (setup/dotfiles). These are the living, evolving skills; `claude-config` is the one-time machine setup.
 
@@ -11,7 +11,7 @@ git clone https://github.com/richardbowman/agent-skills.git ~/Projects/agent-ski
 node ~/Projects/agent-skills/bootstrap.js
 ```
 
-This symlinks every skill directory into `~/.claude/skills/` and every hook script in `hooks/` into `~/.claude/hooks/` so Claude Code picks them up automatically. Re-run after pulling to pick up new skills or hooks.
+This existing bootstrap installs only into Claude Code: it symlinks every skill directory into `~/.claude/skills/` and every hook script in `hooks/` into `~/.claude/hooks/` so Claude Code picks them up automatically. Re-run after pulling to pick up new skills or hooks. Codex installation and discovery are handled by the separate dual-harness configuration workflow in `claude-config`, not by this bootstrap.
 
 > **Note:** `claude-config`'s bootstrap clones this repo as a sibling directory and runs `bootstrap.js` automatically — you only need the above command for standalone setup.
 
@@ -20,7 +20,7 @@ This symlinks every skill directory into `~/.claude/skills/` and every hook scri
 | Skill | Purpose |
 |---|---|
 | `backup-vercel-secrets` | Back up Vercel env vars to 1Password |
-| `brain-dump` | Structured knowledge extraction — Claude interviews you and saves to Obsidian |
+| `brain-dump` | Structured knowledge extraction — the assistant interviews you and saves to Obsidian |
 | `brainstorm` | Active ideation partner — angles, frameworks, structured Obsidian output |
 | `content-marketing` | Content strategy and marketing copy recipes |
 | `dream` | Memory consolidation — scans conversation logs and agent-reported friction (see `log-friction`), updates memory files |

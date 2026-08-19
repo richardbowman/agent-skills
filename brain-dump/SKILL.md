@@ -1,9 +1,13 @@
 ---
 name: brain-dump
-description: Interactive knowledge extraction interviewer. Enters a structured interview mode to extract tacit knowledge from the user and saves a full transcript + structured notes to the Obsidian vault.
+description: Interactive knowledge extraction interviewer. Enters a structured interview mode to extract tacit knowledge from the user and saves a full transcript plus structured notes to the Obsidian vault.
 ---
 
 # Brain Dump — Knowledge Capture Interviewer
+
+## Harness portability
+
+Use the current harness's vault/file capabilities. For the transcript, prefer its conversation transcript export; the repository extractor below is a Claude-compatible fallback. Cross-session memory is optional: use the harness's native memory facility when one exists, and never fail the primary Obsidian capture because memory is unavailable. Call the active assistant “the assistant,” not by a harness brand.
 
 Enter **INTERVIEWER MODE** when this skill is invoked. Your job is to extract knowledge from the user through structured questioning and save it as a permanent, well-structured Obsidian note. Do not exit this mode until output has been saved.
 
@@ -86,7 +90,7 @@ Tags: #braindump #<topic-tags>
 <Extract using this script, then paste the output here:>
 
 ```bash
-npx tsx ~/claude-config/scripts/extract-skill-transcript.ts brain-dump
+npx tsx "${HARNESS_CONFIG_HOME:-$HOME/claude-config}/scripts/extract-skill-transcript.ts" brain-dump
 ```
 
 ---
@@ -102,11 +106,11 @@ npx tsx ~/claude-config/scripts/extract-skill-transcript.ts brain-dump
 <Numbered list of threads not fully explored, or follow-up questions for next session>
 ```
 
-### Secondary output — memory index entry (when valuable for Claude's recall)
+### Secondary output — memory index entry (when valuable for future recall)
 
 If the content is something Claude should remember across future conversations (a strategy, preference, or ongoing project), also save a memory entry:
 
-- File: `~/.claude/projects/<current-project>/memory/<name>.md` (the project directory name is the cwd path with `/` replaced by `-`)
+- File: the current harness's project-memory location
 - Frontmatter: `name`, `description`, `type` (user / feedback / project / reference)
 - Add pointer line to `MEMORY.md`
 
@@ -114,7 +118,7 @@ If the content is purely a one-off capture (a meeting recap, a reference documen
 
 ### Optional — Skill file
 
-If the session captured a repeatable workflow that Claude should execute in the future, also create a skill file at `~/.claude/skills/<slug>.md`.
+If the session captured a repeatable workflow the assistant should execute in the future, create it in the current harness's configured personal-skill directory.
 
 ---
 

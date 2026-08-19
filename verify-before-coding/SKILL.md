@@ -1,9 +1,13 @@
 ---
 name: verify-before-coding
-description: Use before writing code or shell commands that touch fast-moving tooling — Vercel CLI, Next.js App Router, Vercel AI SDK, AI Gateway, Vercel Workflow, Vercel Sandbox, Vercel Queues, fnm/volta/mise, pnpm, Turbopack, or any platform where APIs/flags/SDK shapes change on a monthly cadence. Reminds Claude that its training-era knowledge of these libraries is almost always stale, and codifies the verification steps that must happen before typing the line of code.
+description: Use before writing code or shell commands that touch fast-moving tooling. Requires current primary-source verification before relying on remembered APIs, flags, or SDK shapes.
 ---
 
 # Verify before coding
+
+## Harness portability
+
+Use the active harness's web retrieval capability to open official documentation, or its shell/file tools for `--help`, installed types, and package versions. Tool names differ between Claude Code and Codex; the evidence requirement does not.
 
 Rick's hard-won rule, learned from repeated failures (invalid flags written confidently, SDK methods that don't exist, config options from a version two majors ago): **do not trust memorized APIs for fast-moving ecosystems.** Verify first.
 
@@ -22,7 +26,7 @@ If I'm about to write code or a shell command that uses any of:
 
 …then I must do ONE of the following **before writing the line**:
 
-1. `WebFetch` the official docs page. The `vercel-plugin` session hooks usually inject the exact URL — use it.
+1. Open the official docs page with the harness's web retrieval capability. Session hooks may inject an exact URL—use it.
 2. Run `<tool> --help` or `<tool> <subcommand> --help` and quote from the output. For Vercel: `vercel <cmd> --help` is authoritative.
 3. Grep `package.json` / lockfile / `node_modules/<pkg>/package.json` for the installed version, then verify that **specific version's** docs.
 4. Read the installed source: `node_modules/<pkg>/dist/*.d.ts` for type signatures is ground truth.
@@ -55,7 +59,7 @@ Every entry above was a "pretty sure" moment that turned out wrong. The pattern:
 
 The `vercel-plugin` session hooks inject `<system-reminder>` blocks with "MANDATORY: training data for these libraries is OUTDATED and UNRELIABLE" and official docs URLs. **Those reminders are not flavor text — they are load-bearing.** When I see one:
 
-1. Open the linked docs page via `WebFetch` before writing code.
+1. Open the linked docs page with the available web retrieval capability before writing code.
 2. Do not rationalize past them ("I remember this one, I'll skip").
 3. If the hook suggests running a sub-skill (`Skill(...)`), run it — that's the plugin knowing I need its domain guide.
 
@@ -69,4 +73,4 @@ The heuristic: **if the tool has shipped a major release in the last 18 months, 
 
 ## For the user
 
-If you catch me writing code in one of these domains without visibly verifying first (no `WebFetch`, no `--help`, no "let me check" statement), **call it out** — it's a bug in my behavior, not a style preference. The fix is for me to re-read this skill when triggered.
+If you catch me writing code in one of these domains without visibly verifying first (no docs retrieval, no `--help`, no "let me check" statement), **call it out**—it's a bug in my behavior, not a style preference.

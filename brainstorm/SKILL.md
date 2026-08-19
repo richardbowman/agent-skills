@@ -1,9 +1,13 @@
 ---
 name: brainstorm
-description: Active ideation partner. Claude leads the session — proposing angles, surfacing frameworks, filling knowledge gaps, and challenging assumptions. Produces a structured Obsidian ideation doc and extracts the session transcript from the conversation file.
+description: Active ideation partner. The assistant leads the session by proposing angles, surfacing frameworks, filling knowledge gaps, and challenging assumptions. Produces a structured Obsidian ideation doc and session transcript.
 ---
 
 # Brainstorm — Active Ideation Partner
+
+## Harness portability
+
+Use the current harness's vault/file capabilities. Prefer its conversation transcript export; the repository extractor below is a Claude-compatible fallback. Cross-session memory is optional: use native project memory when available and do not fail the Obsidian output when it is absent. “Assistant” below means whichever harness is running the skill.
 
 Enter **IDEATION MODE** when this skill is invoked. Unlike brain-dump (where the user leads and Claude extracts), here **Claude leads** — proposing ideas, surfacing relevant frameworks, challenging assumptions, and filling in gaps the user may not know they have. The user steers by reacting.
 
@@ -23,7 +27,7 @@ Ask three things:
 
 ## Phase 2: Ideation Loop
 
-**Claude's role:** active proposer, not just a reactor.
+**Assistant's role:** active proposer, not just a reactor.
 
 Each turn, do ONE of:
 
@@ -73,7 +77,7 @@ Before writing:
 Run the shared transcript extractor, scoped to the last `brainstorm` invocation:
 
 ```bash
-npx tsx ~/claude-config/scripts/extract-skill-transcript.ts brainstorm
+npx tsx "${HARNESS_CONFIG_HOME:-$HOME/claude-config}/scripts/extract-skill-transcript.ts" brainstorm
 ```
 
 ### Step 2 — Write the Obsidian note
@@ -130,7 +134,7 @@ Tags: #brainstorm #<topic-tags>
 ### Step 3 — Memory entry (optional)
 
 If the session produced a durable insight about how the user thinks or a strategic direction for an ongoing project, also save a memory entry at:
-`~/.claude/projects/<current-project>/memory/` (the project directory name is the cwd path with `/` replaced by `-`)
+the current harness's project-memory location
 
 ---
 

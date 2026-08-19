@@ -5,6 +5,10 @@ description: Pre-production workflow for Remotion social videos. Creates a story
 
 # Video Storyboard — Pre-Production Skill
 
+## Harness portability
+
+Create/edit the storyboard with the harness's vault or filesystem tools. Open it with an available workspace navigation tool; if none exists, use the Obsidian URL scheme only after obtaining approval for GUI execution when required. The storyboard gate and user-approval steps are identical in Claude Code and Codex.
+
 Use this skill at the START of any new Remotion video. The rule is: **storyboard before code**. No TTS, no Whisper, no composition until the script and scene plan are agreed on in Obsidian.
 
 ---
@@ -28,10 +32,7 @@ Create a new Obsidian doc at:
 
 Use the template below. Open it in Obsidian using the MCP tool (preferred) — fall back to the URL scheme only if MCP is unavailable:
 
-**Preferred — MCP tool:**
-```
-mcp__obsidian__obsidian_navigate_to_file("Claude/<kebab-name>-storyboard.md")
-```
+**Preferred:** use the harness's workspace navigation tool for `Claude/<kebab-name>-storyboard.md`.
 
 **Fallback — URL scheme (may not work in all contexts):**
 ```bash

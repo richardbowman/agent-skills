@@ -5,7 +5,11 @@ description: Log a piece of agent-side operational friction (a wrong turn, waste
 
 # Log Friction
 
-A one-line tool: append a structured entry to `~/.claude/friction-log.jsonl` describing something that went wrong in *how you worked*, not what the user asked for.
+## Harness portability
+
+Set `AGENT_STATE_HOME` to the active harness state directory. Resolve `log.ts` relative to this skill directory rather than a Claude-only installation path; both Claude Code and Codex can execute the Node script through their shell tools. The append-only, non-blocking behavior is unchanged.
+
+A one-line tool: append a structured entry to `${AGENT_STATE_HOME}/friction-log.jsonl` describing something that went wrong in *how you worked*, not what the user asked for.
 
 ## When to invoke
 
@@ -22,7 +26,7 @@ Skip it for: routine debugging with no real dead end, user preference correction
 ## How to invoke
 
 ```bash
-node ~/.claude/skills/log-friction/log.ts \
+node "<log-friction-skill-directory>/log.ts" \
   --agent <role, e.g. engineer|qa|reviewer|architect|main> \
   --project <repo or project slug, e.g. golden-wealth-app> \
   --summary "<one sentence — what went wrong>" \
@@ -36,9 +40,9 @@ This never blocks or asks for confirmation — it's a pure append, safe to call 
 
 ## What happens to logged entries
 
-The `dream` skill (run weekly, or on demand via `/dream`) reads `~/.claude/friction-log.jsonl` in its Phase 2a, treats every entry as a pre-qualified signal — no transcript-noise classifier needed, since you wrote it on purpose — and folds it into the same pattern-analysis / dedup / feedback-file pipeline as transcript-mined signals. A friction pattern that shows up here repeatedly gets written to a `feedback_*.md` memory file or escalated toward CLAUDE.md, same as any other recurring friction.
+The `dream` skill (run weekly or on demand) reads `${AGENT_STATE_HOME}/friction-log.jsonl` in Phase 2a, treats every entry as a pre-qualified signal, and folds it into the same pattern-analysis, deduplication, and feedback-file pipeline as transcript-mined signals. Repeated friction becomes a feedback rule or is escalated toward harness-level guidance.
 
 ## Design notes
 
-- Single global JSONL (`~/.claude/friction-log.jsonl`), not per-project — every agent appends here regardless of which repo it's working in. The `project` field on each entry is what lets `dream` (or Rick) filter later.
+- Single global JSONL (`${AGENT_STATE_HOME}/friction-log.jsonl`), not per-project—every agent appends here regardless of repo. The `project` field supports later filtering.
 - Append-only, no rotation. `dream` filters by `ts` against its own last-run cursor (same pattern `scan.ts` uses for conversation transcripts), so old entries simply age out of future runs without needing to be deleted.
