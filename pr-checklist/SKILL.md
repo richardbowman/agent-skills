@@ -4,7 +4,7 @@ description: >-
   Run the pre-PR definition-of-done checklist for a feature branch. Ensures
   types, unit tests, E2E tests, docs, visual verification, and screenshots are
   all complete before opening a PR or marking a Linear issue In Review. Uses
-  per-repo guidelines from .claude/pr-guidelines.md when present; offers to
+  per-repo guidelines from .agents/pr-guidelines.md or .claude/pr-guidelines.md; offers to
   scaffold them if not. Use whenever a development task is considered "done"
   or a PR is about to be opened.
 metadata:
@@ -21,16 +21,19 @@ retrieval:
 
 # PR Checklist — Definition of Done
 
+## Harness portability
+
+Use the active harness's shell, file, test, browser, and image-inspection capabilities. Look for `.agents/pr-guidelines.md` and `.claude/pr-guidelines.md`; if both exist, merge compatible requirements and stop on conflicts. Harness hook formats are optional enforcement adapters—the checklist itself remains authoritative in Claude Code and Codex.
+
 A feature is NOT done until every item below passes. Do not open a PR, push to
 main, or mark a Linear issue In Review until this checklist is complete.
 
 ## Step 0 — Load Per-Repo Guidelines
 
-**Before running any checklist step**, check whether `.claude/pr-guidelines.md`
-exists in the project root:
+**Before running any checklist step**, resolve the repository guidance file:
 
 ```bash
-ls .claude/pr-guidelines.md
+for f in .agents/pr-guidelines.md .claude/pr-guidelines.md; do test -f "$f" && echo "$f"; done
 ```
 
 **If the file exists:** read it and let it override or extend every step below.
@@ -38,9 +41,9 @@ The guidelines file is the authoritative source for this repo's definition of
 done. Any command, viewport, coverage threshold, or process it specifies takes
 precedence over the defaults in this skill.
 
-**If the file does not exist:** offer to create it before proceeding:
+**If neither file exists:** offer to create the harness-native file before proceeding (`.agents/pr-guidelines.md` for Codex, `.claude/pr-guidelines.md` for Claude Code):
 
-> "This project doesn't have a `.claude/pr-guidelines.md` yet. That file lets
+> "This project doesn't have a harness PR-guidelines file yet. That file lets
 > you customize the PR checklist per repo — commands, viewports to test,
 > screenshot tooling, docs location, coverage requirements, etc.
 >
@@ -55,8 +58,8 @@ skip, continue with the defaults in Steps 1-6.
 
 ## Guidelines Setup Wizard
 
-Ask the following questions, then write `.claude/pr-guidelines.md`. Commit it
-so all contributors and future Claude sessions inherit the config.
+Ask the following questions, then write the harness-native guidelines file. Commit it
+so all contributors and future assistant sessions inherit the config.
 
 **Questions to ask:**
 
@@ -84,7 +87,7 @@ so all contributors and future Claude sessions inherit the config.
 Write the output as a Markdown file using the template below. Fill in every
 section the user answered; omit sections that don't apply.
 
-### Template for `.claude/pr-guidelines.md`
+### Template for the harness-native PR guidelines
 
 ```markdown
 # PR Guidelines — <Project Name>
@@ -280,8 +283,9 @@ autonomous work on a project — especially multi-step builds where you will pus
 multiple times — install the enforcement hook **before starting**, not after
 something breaks.
 
-Check whether `.claude/settings.json` exists in the project root. If it
-doesn't, create it with this hook:
+Claude Code adapter: check whether `.claude/settings.json` exists in the project root. If it
+doesn't, create it with this hook. Codex does not use this hook schema; keep the
+gate in `AGENTS.md` and the skill checklist instead of writing an incompatible hook.
 
 ```json
 {

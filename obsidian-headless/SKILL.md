@@ -5,6 +5,10 @@ description: Read and write notes in the user's Obsidian PersonalVault and sync 
 
 # Obsidian Headless
 
+## Harness portability
+
+Use native vault tools when the harness provides them; otherwise use filesystem read/write tools against the configured vault path and then run the sync CLI through a shell execution tool. Tool brand names are intentionally omitted because Claude Code and Codex expose different names for the same operations.
+
 Headless Obsidian Sync client for Linux (no desktop app). Vault is a plain folder on disk — read/write `.md` files directly, then sync.
 
 > **Environment config** (binary path, vault path, vault ID) lives in `TOOLS.md`, not here.
@@ -23,8 +27,8 @@ Output shows vault ID and local path. Use the path for all subsequent commands.
 
 Write `.md` files directly to the vault folder — no CLI needed for that part. Then sync.
 
-- Claude session notes → `Claude/YYYY-MM-DD-slug.md`
-- Use Write or Edit tools, then run sync
+- Assistant session notes → `Claude/YYYY-MM-DD-slug.md` (the folder name is retained for vault compatibility)
+- Use the available vault tools or filesystem editor, then run sync
 
 ## Syncing
 

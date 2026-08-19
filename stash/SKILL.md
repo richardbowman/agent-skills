@@ -1,4 +1,13 @@
+---
+name: stash
+description: Park the current work by writing a compact resumable handoff note to the vault and linking it from today's daily note.
+---
+
 # stash
+
+## Harness portability
+
+Read the current conversation through the harness's available message history and use its vault/file tools to write the note. A resume prompt must brief any new assistant session, not assume Claude-specific state or commands. Preserve existing vault folder and heading names for compatibility.
 
 Wrap up the current conversation — summarize what was accomplished, capture the context needed to resume, write a stash note to the vault, and link it from today's daily note. Run at end of a session when you want to park the work cleanly.
 
@@ -58,7 +67,7 @@ status: parked
 > Paste this to pick up where you left off:
 
 ```
-[Resume prompt — a self-contained 2–4 sentence prompt that gives Claude enough context to continue. Include key file paths, what was being worked on, and what to do next. Write it in second person as if briefing a new Claude session.]
+[Resume prompt — a self-contained 2–4 sentence prompt that gives the next assistant enough context to continue. Include key file paths, what was being worked on, and what to do next. Write it in second person.]
 ```
 
 ## Key References

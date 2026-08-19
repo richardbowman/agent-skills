@@ -1,9 +1,13 @@
 ---
 name: dream
-description: Memory consolidation + friction mining for Claude Code. Scans recent conversation logs to surface feedback opportunities, updates memory files, and keeps MEMORY.md lean. Run when the user invokes /dream, or via the "Weekly /dream — memory consolidation" CronCreate job (Sundays 21:00 — check `CronList` for the live schedule; this cron is the only automated trigger, there is no Stop-hook trigger in settings.json).
+description: Memory consolidation and friction mining. Scans supported conversation logs and agent-reported friction, updates memory files, and keeps the memory index lean.
 ---
 
 # Dream — Memory Consolidation & Friction Mining
+
+## Harness portability
+
+Set `AGENT_STATE_HOME` to the active harness state directory (Claude: `$HOME/.claude`; Codex: its configured state home) before running commands. Read escalation guidance from `CLAUDE.md` or `AGENTS.md`. The bundled `scan.ts` currently understands Claude Code JSONL only: in a harness with an unsupported conversation-log format, report that limitation and skip only transcript mining; still process agent-reported friction, carryover, memory deduplication, and reporting. Never pretend an unsupported conversation-log source was scanned.
 
 Modeled on Anthropic's unreleased auto-dream feature, extended with a friction-mining phase that mines conversation logs for moments where the user expressed frustration, corrected a mistake, or stated a preference — then turns those signals into new `feedback_*.md` memory files.
 
@@ -15,10 +19,10 @@ Modeled on Anthropic's unreleased auto-dream feature, extended with a friction-m
 
 | Path | Purpose |
 |---|---|
-| `~/.claude/dream-last-run` | ISO-8601 UTC timestamp of last completed dream |
-| `~/.claude/projects/<project-slug>/memory/` | Per-project memory (feedback rules, project context) |
-| `~/.claude/skills/dream/scan.ts` | Canonical Phase 2 friction/praise scanner (Node/TS — see Phase 2) |
-| `~/.claude/friction-log.jsonl` | Agent-self-reported operational friction, appended via the `log-friction` skill — read directly in Phase 2a |
+| `${AGENT_STATE_HOME}/dream-last-run` | ISO-8601 UTC timestamp of last completed dream |
+| `${AGENT_STATE_HOME}/projects/<project-slug>/memory/` | Per-project memory (feedback rules, project context) |
+| `<dream-skill-directory>/scan.ts` | Canonical Phase 2 friction/praise scanner (Node/TS — see Phase 2) |
+| `${AGENT_STATE_HOME}/friction-log.jsonl` | Agent-self-reported operational friction, appended via the `log-friction` skill — read directly in Phase 2a |
 | `~/Documents/Personal/Claude/dream-YYYY-MM-DD.md` | Dated run reports (also the carryover source — see Phase 1) |
 
 ---
@@ -29,23 +33,23 @@ Read current state before doing anything else.
 
 ```bash
 # Last run timestamp
-LAST_RUN=$(cat ~/.claude/dream-last-run 2>/dev/null || echo "never (defaulting to 30 days ago)")
+LAST_RUN=$(cat "${AGENT_STATE_HOME}/dream-last-run" 2>/dev/null || echo "never (defaulting to 30 days ago)")
 echo "Last dream: $LAST_RUN"
 
 # Count conversation files
-find ~/.claude/projects -name "*.jsonl" | wc -l
+find "${AGENT_STATE_HOME}/projects" -name "*.jsonl" | wc -l
 
 # Count agent-reported friction entries waiting to be read (see Phase 2a)
-wc -l ~/.claude/friction-log.jsonl 2>/dev/null || echo "0 (no friction-log.jsonl yet)"
+wc -l "${AGENT_STATE_HOME}/friction-log.jsonl" 2>/dev/null || echo "0 (no friction-log.jsonl yet)"
 
 # List existing feedback files across all project memory dirs
-find ~/.claude/projects -path "*/memory/feedback_*.md" 2>/dev/null
+find "${AGENT_STATE_HOME}/projects" -path "*/memory/feedback_*.md" 2>/dev/null
 
 # Flag feedback files older than 90 days — archive candidates for Phase 4d.
 # This is a real check every run, not a note: don't let files silently age
 # past 90 days unreviewed.
 echo "--- Feedback files older than 90 days (archive candidates) ---"
-find ~/.claude/projects -path "*/memory/feedback_*.md" -mtime +90 2>/dev/null
+find "${AGENT_STATE_HOME}/projects" -path "*/memory/feedback_*.md" -mtime +90 2>/dev/null
 
 # Most recent prior dream report — the carryover source (see below)
 ls -t ~/Documents/Personal/Claude/dream-2*.md 2>/dev/null | head -1
@@ -76,22 +80,22 @@ If old but still active, leave it and note "checked, kept" in the report. If uns
 Run the canonical scanner to extract user messages that signal frustration, corrections, or stated preferences. This is the core of what makes this skill different from standard memory consolidation.
 
 ```bash
-node ~/.claude/skills/dream/scan.ts
+node "<dream-skill-directory>/scan.ts"
 ```
 
 This is a checked-in Node/TypeScript file (per Rick's global "never use Python for scripts" rule — Node 22.6+ runs `.ts` natively, no build step). Do **not** reimplement this in a Bash/Python heredoc each run — always invoke the canonical script so fixes to the fingerprint lists (see "Known scanner pitfalls") persist across runs instead of being re-derived from memory.
 
-To modify the scanner's filtering (new noise source, new pattern), edit `~/.claude/skills/dream/scan.ts` directly and re-run it. It holds the `FRICTION_PATTERNS`/`PRAISE_PATTERNS` regex lists and the `ORCHESTRATION_MARKERS`/`SYNTHETIC_PREFIXES` fingerprint lists that filter out Claude-authored dispatch/relay/cron text logged with `role: "user"`.
+To modify the scanner's filtering, edit `<dream-skill-directory>/scan.ts` and re-run it. It holds the pattern and fingerprint lists that filter synthetic dispatch/relay/cron text logged with `role: "user"`.
 
 ---
 
 ## Phase 2a: AGENT-REPORTED FRICTION (structured, pre-qualified)
 
-Separate signal source from the transcript scan above: agents can self-report operational friction directly via the `log-friction` skill (`~/.claude/skills/log-friction/`), which appends to `~/.claude/friction-log.jsonl`. This is a different signal class than Phase 2's transcript mining — it's the agent's own account of what went wrong in *how it worked* (wrong turns, wasted retries, stale docs, tools that didn't match their docs), not Rick's reaction to the result. It doesn't need the noise filtering Phase 2.5 exists for, because it was written on purpose by an agent, not incidentally captured from a chat turn.
+Separate signal source from the transcript scan above: agents can self-report operational friction through the `log-friction` skill, which appends to `${AGENT_STATE_HOME}/friction-log.jsonl`. This is a different signal class than Phase 2's transcript mining—the agent's own account of what went wrong in how it worked, rather than the user's reaction to the result. It skips Phase 2.5 because it was intentionally authored by an agent.
 
 ```bash
 # No canonical script needed — this file is small enough to read directly.
-cat ~/.claude/friction-log.jsonl 2>/dev/null
+cat "${AGENT_STATE_HOME}/friction-log.jsonl" 2>/dev/null
 ```
 
 Each line is one JSON object: `{ts, agent, project, summary, detail, severity, cwd}`. Keep only entries whose `ts` is after `$LAST_RUN` (same cursor as Phase 1). Treat every surviving entry as a **pre-qualified candidate** — skip Phase 2.5 for these, and carry them straight into Phase 3 alongside (not instead of) the transcript-mined hits. If `friction-log.jsonl` doesn't exist yet or has zero new entries, note that in the report and move on — it's expected to be sparse until agents adopt the habit.
@@ -165,7 +169,7 @@ For each keeper that survived 3a–3c, draft:
 
 ### 4a. Create new feedback files
 
-Only for signals that cleared the Phase 3c dedup check. Write to the appropriate project memory dir: `~/.claude/projects/<project-slug>/memory/feedback_<slug>.md`. For cross-project rules (communication style, tool habits), use the global project dir: `~/.claude/projects/-Users-<username>/memory/`.
+Only for signals that cleared the Phase 3c dedup check. Write to `${AGENT_STATE_HOME}/projects/<project-slug>/memory/feedback_<slug>.md`. For cross-project rules, use the corresponding global project directory beneath `${AGENT_STATE_HOME}/projects/`.
 
 Use this exact format:
 
@@ -258,7 +262,7 @@ Open in Obsidian with the `obsidian_navigate_to_file` tool (path `Claude/dream-$
 ## Phase 6: STAMP
 
 ```bash
-date -u +%Y-%m-%dT%H:%M:%SZ > ~/.claude/dream-last-run
+date -u +%Y-%m-%dT%H:%M:%SZ > "${AGENT_STATE_HOME}/dream-last-run"
 echo "Dream complete. Next scheduled run: Sunday 21:00 (Weekly /dream cron), or sooner if manually invoked."
 ```
 
@@ -290,6 +294,6 @@ echo "Dream complete. Next scheduled run: Sunday 21:00 (Weekly /dream cron), or 
 - **(2026-07-26) Recurring cron dispatch prompts read as friction/praise noise.** Standing jobs (Monthly Amazon Data Export, e-tron GT deal monitor) inject a fixed header/persona prompt every run that coincidentally matched friction patterns and dominated one scan (82 of 86 hits). Filtered via `SYNTHETIC_PREFIXES`/`ORCHESTRATION_MARKERS` entries. When a new recurring cron job is added, check its dispatch prompt against these lists.
 - **(2026-07-26) Inter-thread relay messages read as Rick's words.** One thread messaging another via `obsidian_send_message_to_thread` logs as `role: "user"` wrapped in "Another Claude session sent a message:\n<agent-message from=...>". Claude-to-Claude, not Rick — filtered via `SYNTHETIC_PREFIXES` + an `<agent-message from=` substring check.
 - **(2026-07-28) No structural discriminator exists — content is the only signal.** Verified on real logs: cron dispatches, inter-thread relays, and genuinely human-typed messages all carry identical envelope fields (`entrypoint='sdk-ts'`, `promptSource='sdk'`, `userType='external'`), because the Obsidian plugin routes everything through the same SDK path. Per-file human-turn-count also fails to separate them (the plugin fragments one conversation across many single-turn session files). So the regex prefilter + Phase 2.5 judgment pass is the right design; don't waste time re-attempting an envelope-field or turn-count classifier.
-- **(2026-07-28) Phase 2 is a checked-in script, not a heredoc.** The scanner used to be an embedded Python `<<PYEOF` heredoc, conflicting with the "never use Python" rule (every run either violated it or improvised an unverified reimplementation). Now `~/.claude/skills/dream/scan.ts`, run with `node`. Edit that file directly; don't reintroduce an inline copy.
+- **(2026-07-28) Phase 2 is a checked-in script, not a heredoc.** Run `<dream-skill-directory>/scan.ts` with `node`. Edit that file directly; don't reintroduce an inline copy.
 - **(2026-07-28) Age ≠ staleness — never auto-archive on the 90-day mark alone.** First real run of the age-check found 21 of 33 feedback files already >90 days by mtime, most being still-active standing rules (DSQL constraints, migration policy). Phase 1b/4d require independent evidence of staleness before archiving; surface ambiguous batches to Rick.
-- **(2026-08-14) Added Phase 2a — agent-reported friction.** New `log-friction` skill + `~/.claude/friction-log.jsonl` let agents self-report operational friction directly instead of relying solely on transcript mining, which only catches things Rick happened to comment on. Phase 2a entries skip Phase 2.5's classifier since they're intentionally authored, not incidentally captured from a chat turn. If this source stays empty run after run, the likely cause is agents not adopting the habit — check whether `log-friction`'s description is actually triggering proactive use, not whether the reader logic is broken.
+- **(2026-08-14) Added Phase 2a — agent-reported friction.** The `log-friction` skill and `${AGENT_STATE_HOME}/friction-log.jsonl` add intentional agent reports alongside transcript mining. These entries skip Phase 2.5 because they are intentionally authored.

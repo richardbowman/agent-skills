@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // Agent friction logger — appends a structured JSON line to
-// ~/.claude/friction-log.jsonl so the `dream` skill (Phase 2a) can read
+// AGENT_STATE_HOME/friction-log.jsonl so the `dream` skill can read
 // agent-self-reported operational friction directly, instead of relying
 // solely on mining transcripts for signals Rick happened to comment on.
 //
 // Usage:
-//   node ~/.claude/skills/log-friction/log.ts \
+//   node <log-friction-skill-directory>/log.ts \
 //     --agent engineer \
 //     --project golden-wealth-app \
 //     --summary "Retried DSQL migration twice before finding root cause" \
@@ -21,7 +21,8 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
-const LOG_FILE = path.join(os.homedir(), ".claude", "friction-log.jsonl");
+const STATE_HOME = process.env.AGENT_STATE_HOME ?? path.join(os.homedir(), ".claude");
+const LOG_FILE = path.join(STATE_HOME, "friction-log.jsonl");
 
 function parseArgs(argv: string[]): Record<string, string> {
   const out: Record<string, string> = {};

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // Dream skill — Phase 2 friction/praise scanner.
 // Canonical implementation (Node/TypeScript per Rick's "never use Python for
-// scripts" rule — run natively with `node ~/.claude/skills/dream/scan.ts`,
+// scripts" rule — run natively from the installed dream skill directory,
 // no build step needed on Node 22.6+).
 //
-// Scans conversation JSONL logs under ~/.claude/projects for user-authored
+// Scans conversation JSONL logs under AGENT_STATE_HOME/projects for user-authored
 // messages (since the last dream run) that match friction or praise regex
 // patterns, after filtering out Claude-authored dispatch/relay/cron text
 // that gets logged with role:"user" but was never typed by Rick.
@@ -16,8 +16,9 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
-const LAST_RUN_FILE = path.join(os.homedir(), ".claude", "dream-last-run");
-const LOGS_DIR = path.join(os.homedir(), ".claude", "projects");
+const STATE_HOME = process.env.AGENT_STATE_HOME ?? path.join(os.homedir(), ".claude");
+const LAST_RUN_FILE = path.join(STATE_HOME, "dream-last-run");
+const LOGS_DIR = path.join(STATE_HOME, "projects");
 
 function globJsonl(dir: string): string[] {
   const results: string[] = [];

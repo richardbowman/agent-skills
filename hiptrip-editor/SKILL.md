@@ -5,6 +5,10 @@ description: Recipes for acting as a HipTrip editor agent — writing and publis
 
 # HipTrip Editor Agent
 
+## Harness portability
+
+Use any available shell execution capability for the documented commands. Resolve the repository/worktree from the current working directory or an explicit `HIPTRIP_REPO` value; never assume a harness-owned worktree directory. Secret-handling and publish-confirmation requirements are identical in Claude Code and Codex.
+
 All editor actions go through `/api/editor/agent/*`. These routes use a shared secret for auth — no session cookie needed.
 
 ## Setup
@@ -20,7 +24,7 @@ For local dev (after `nextdev start`):
 ```bash
 BASE="http://localhost:3000"
 # Use the worktree's .env.local, not the main repo's
-SECRET=$(grep EDITOR_AGENT_SECRET ~/projects/hip-trip-marketing-site/.claude/worktrees/agentic-claude-code/.env.local | cut -d= -f2 | tr -d '"')
+SECRET=$(grep EDITOR_AGENT_SECRET "${HIPTRIP_REPO:-$PWD}/.env.local" | cut -d= -f2 | tr -d '"')
 ```
 
 **If `EDITOR_AGENT_SECRET` is not yet in `.env.local`**, generate and add it:

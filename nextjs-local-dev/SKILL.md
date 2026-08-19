@@ -7,7 +7,11 @@ description: Manage a local Next.js dev server from the shell — start, stop, r
 
 Run Next.js natively (not in a container) and manage the dev server through the `nextdev` CLI. `nextdev` keys each instance by absolute cwd, so a git worktree has its own independent server on its own port. The script **only ever touches processes it started**.
 
-## CRITICAL — process-safety rules for Claude
+## Harness portability
+
+Use the active harness's shell and background execution capability. If it has no background mode, run `nextdev` normally because the helper itself daemonizes the server, then inspect its log file with the harness's file reader. The process-safety rules below apply unchanged to Claude Code and Codex.
+
+## CRITICAL — process-safety rules
 
 These rules exist because in past sessions the assistant has killed every node process on the box, taking down unrelated work.
 
@@ -91,10 +95,10 @@ nextdev logs -n 200
 
 **Checking logs after `nextdev start` (do NOT use `sleep`):**
 
-The session blocks `sleep N` (N ≥ 2) before commands. Instead, run `nextdev logs` immediately — the log file is written by the background process and will contain whatever has been emitted so far. Use `run_in_background: true` on the Bash tool call so the tool exits quickly, then read the output file when notified:
+Do not block on `sleep N` (N ≥ 2). Run `nextdev logs` immediately—the background process writes the log continuously. If the harness supports background tool calls, use that mode; otherwise invoke the command normally and inspect the log path it reports.
 
 ```sh
-# in the Bash tool, with run_in_background: true
+# run with the harness's background execution capability when available
 nextdev logs -n 40
 ```
 

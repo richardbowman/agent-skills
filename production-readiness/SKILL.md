@@ -1,4 +1,13 @@
+---
+name: production-readiness
+description: Run the Golden Wealth pre-merge production readiness checklist covering tests, types, UI, database safety, deployment, and documentation.
+---
+
 # Production readiness checklist
+
+## Harness portability
+
+Use the current harness's shell and file tools. When the checklist refers to repository guidance, read `AGENTS.md` or `CLAUDE.md` as available; project-specific safety requirements remain binding in either harness.
 
 Use this before merging any feature PR on the golden-wealth-app. Work through every section in order. Each section lists what to check and how.
 
@@ -61,7 +70,7 @@ If the feature adds or changes schema:
 - Every DDL statement is followed by `COMMIT;` on its own line
 - `CREATE INDEX` uses `ASYNC`
 - No `DEFAULT` in `ALTER TABLE ADD COLUMN`
-- No foreign keys, no SERIAL, no JSONB, no TIMESTAMPTZ (DSQL constraints — see CLAUDE.md)
+- No foreign keys, no SERIAL, no JSONB, no TIMESTAMPTZ (DSQL constraints — see `AGENTS.md` or `CLAUDE.md`)
 - `prisma/schema.prisma` has been updated to match
 - `npx prisma generate` has been run and the generated client is committed
 

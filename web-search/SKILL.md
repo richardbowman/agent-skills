@@ -5,6 +5,10 @@ description: Search the web using Google Custom Search JSON API. Use when the us
 
 # Web Search
 
+## Harness portability
+
+Use the active harness's shell execution tool to run the local script. To open result pages, use its web retrieval tool for static content and the `agent-browser` skill for interactive or blocked sites. The local command is a fallback when a native web-search capability is unavailable.
+
 Search the web via Google Custom Search JSON API, backed by your GCP project.
 
 ## When to Use
@@ -17,10 +21,10 @@ Use this skill whenever the user asks to:
 
 ## Tool
 
-Use `Bash` to invoke the `web-search` script:
+Use a shell execution tool to invoke the `web-search` script:
 
 ```bash
-~/claude-config/bin/web-search "your query"
+"${HARNESS_CONFIG_HOME:-$HOME/claude-config}/bin/web-search" "your query"
 ```
 
 ### Options
@@ -36,16 +40,16 @@ Use `Bash` to invoke the `web-search` script:
 
 ```bash
 # General search
-~/claude-config/bin/web-search "Andrej Karpathy LLM Wiki"
+"${HARNESS_CONFIG_HOME:-$HOME/claude-config}/bin/web-search" "Andrej Karpathy LLM Wiki"
 
 # Site-specific
-~/claude-config/bin/web-search "Claude Code WebSearch Bedrock" --site docs.anthropic.com
+"${HARNESS_CONFIG_HOME:-$HOME/claude-config}/bin/web-search" "Claude Code WebSearch Bedrock" --site docs.anthropic.com
 
 # Fewer results for a quick lookup
-~/claude-config/bin/web-search "what is Exa search API" --num 3
+"${HARNESS_CONFIG_HOME:-$HOME/claude-config}/bin/web-search" "what is Exa search API" --num 3
 
 # Get next page
-~/claude-config/bin/web-search "platform engineering tools 2025" --start 11
+"${HARNESS_CONFIG_HOME:-$HOME/claude-config}/bin/web-search" "platform engineering tools 2025" --start 11
 ```
 
 ## Workflow
@@ -53,8 +57,8 @@ Use `Bash` to invoke the `web-search` script:
 1. Run `web-search` with the user's query
 2. Review the returned titles, URLs, and snippets
 3. Fetch full content from the most relevant URLs:
-   - Use `WebFetch` for simple static pages (docs, blogs, plain HTML)
-   - Use `agent-browser` for e-commerce/retail sites, JS-heavy pages, or anything that returns a 403/CAPTCHA/empty shell via WebFetch
+   - Use the harness's web retrieval tool for simple static pages (docs, blogs, plain HTML)
+   - Use `agent-browser` for e-commerce/retail sites, JS-heavy pages, or anything that returns a 403/CAPTCHA/empty shell through static retrieval
 4. Answer the user based on what you fetched
 
 ## Setup Status
@@ -69,7 +73,7 @@ The script uses your existing `gws` OAuth credentials — no separate API key ne
 > Create one at: https://programmablesearchengine.google.com/ (set to search entire web)
 
 **Missing `cse` scope / token error:**
-> The `cse` scope needs to be added to your gws token. Ask Claude to run `gws auth login` with the consolidated scope list from your GWS OAuth Scopes memory note, plus `https://www.googleapis.com/auth/cse`.
+> The `cse` scope needs to be added to your gws token. Ask the assistant to run `gws auth login` with the consolidated scope list from your GWS OAuth Scopes memory note, plus `https://www.googleapis.com/auth/cse`.
 
 **First-time setup checklist:**
 1. Enable Custom Search API → https://console.cloud.google.com/apis/library/customsearch.googleapis.com (select your GCP project)
