@@ -5,7 +5,7 @@ import test from "node:test";
 
 const skills = [
   "brain-dump", "brainstorm", "chief-of-staff", "dream", "hiptrip-editor",
-  "log-friction", "nextjs-local-dev", "obsidian-headless", "pr-checklist",
+  "log-friction", "nextjs-local-dev", "pr-checklist",
   "production-readiness", "rb-personal-assistant", "remotion-video-ads", "stash",
   "verify-before-coding", "video-storyboard", "web-search", "worktree-bootstrap",
 ];
@@ -58,7 +58,6 @@ test("representative workflows state native alternatives without weakening behav
     dream: [/CLAUDE\.md.*AGENTS\.md|AGENTS\.md.*CLAUDE\.md/s, /unsupported.*conversation-log/i],
     "log-friction": [/AGENT_STATE_HOME/, /skill directory/i],
     "nextjs-local-dev": [/background execution capability/i],
-    "obsidian-headless": [/vault tools.*filesystem|filesystem.*vault tools/is],
     "pr-checklist": [/\.claude\/pr-guidelines\.md/, /\.agents\/pr-guidelines\.md/],
     "production-readiness": [/CLAUDE\.md/, /AGENTS\.md/],
     "remotion-video-ads": [/CLAUDE\.md/, /AGENTS\.md/],
