@@ -333,9 +333,25 @@ vercel logs dpl_abc123 --no-follow --json | jq '.message'
 
 ---
 
-## Secrets workflow: Password Manager → Vercel
+## Secrets workflow: Harness → Password Manager → Vercel
 
-Always fetch secrets from the project's password manager rather than guessing or relying on `.env.local` (which may be stale or empty for encrypted vars). Check project memory for which password manager applies — work projects use Keeper, personal projects use 1Password.
+Check harness-injected environment variables before opening a password manager. Harness secrets are the preferred runtime source because they are already scoped to the active agent session and avoid unnecessary credential-store access.
+
+1. Inspect environment variable **names only** to find the project- and environment-specific secret. Never print values. Prefer explicit names such as `COMPASS_PRODUCTION_MIGRATION_SECRET` or `COMPASS_PREVIEW_MIGRATION_SECRET` over a generic `MIGRATION_SECRET`.
+2. If the exact required variable exists and is non-empty, use it directly.
+3. Only when no suitable harness variable exists, fetch the secret from the project's password manager. Work projects use Keeper; personal projects use 1Password.
+4. Do not rely on `.env.local` to decide whether a secret exists; it may be stale or empty for encrypted variables.
+
+Safe discovery example:
+
+```bash
+env | cut -d= -f1 | grep -Ei 'project-name|migration|secret' | sort
+test -n "${PROJECT_PRODUCTION_MIGRATION_SECRET:-}"
+```
+
+The discovery command must output names only. Do not run `env` without removing values.
+
+### Password-manager fallback
 
 **Keeper (work projects):**
 ```bash
