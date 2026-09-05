@@ -83,7 +83,7 @@ When scanning Rick's daily note or a backlog to find tasks to take on:
 2. **Start autonomous tasks immediately** — work them in parallel where possible
 3. **Surface confirmation-required tasks** — present the draft and ask before proceeding
 4. **Never send on assumption** — "it looked ready" is not confirmation
-5. **Update the daily note when done** — after completing any autonomous task, append a summary of what was done to today's daily note at `/Users/rbowman/Documents/BankRate/Daily/YYYY-MM-DD.md`. Add it as a named section (e.g., `### Skill built: br-weekly-review`) so Rick has a running log of what was accomplished.
+5. **Update the daily note when done** — after completing any autonomous task, append a summary of what was done to today's daily note (vault-relative, commonly `Daily/YYYY-MM-DD.md` — locate the vault's actual daily-note folder rather than assuming). Add it as a named section (e.g., `### Skill built: br-weekly-review`) so Rick has a running log of what was accomplished.
 
 ---
 

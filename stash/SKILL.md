@@ -83,15 +83,25 @@ status: parked
 
 ### 3. Write the file
 
-Write the stash note to the vault path. Use `Write` tool with the absolute path:
+Write the stash note to this vault-relative path:
 
 ```
-/Users/rbowman/Documents/BankRate/Operations/Stash/YYYY-MM-DD - [topic-slug].md
+Operations/Stash/YYYY-MM-DD - [topic-slug].md
 ```
+
+**Resolve it against the actual vault root before writing.** If the harness exposes
+vault-relative tools, prefer those. If writing via a filesystem tool that needs an
+absolute path, confirm the vault root first — a path that merely *looks* like the
+vault (e.g. `~/Documents/<VaultName>`) may be a different directory, and writing
+there silently creates a shadow tree that masks the real vault. Verify the file
+landed where you intended, and match the existing filename convention in the folder.
 
 ### 4. Link from daily note
 
-Append to the `### Notes` section of today's daily note at `Operations/Daily/YYYY-MM-DD.md`:
+Append to today's daily note, under the heading that vault already uses for session
+links (commonly `### Notes` or `## Claude Sessions` — match what is there, do not add
+a new heading). Locate the daily note first; the folder is commonly `Daily/` or
+`Operations/Daily/`:
 
 ```markdown
 - Stashed session: [[Operations/Stash/YYYY-MM-DD - [topic-slug]|[Topic Name] stash]]
@@ -108,8 +118,16 @@ Report back:
 
 ## File Locations
 
-- Stash notes: `/Users/rbowman/Documents/BankRate/Operations/Stash/`
-- Daily notes: `/Users/rbowman/Documents/BankRate/Operations/Daily/YYYY-MM-DD.md`
+All paths are **vault-relative** — resolve them against the current vault root, which
+the harness provides. Never hardcode an absolute path or a machine-specific home
+directory; the same skill runs against different vaults on different machines.
+
+- Stash notes: `Operations/Stash/`
+- Daily notes: locate the vault's daily-note folder before writing — it is commonly
+  `Daily/YYYY-MM-DD.md` or `Operations/Daily/YYYY-MM-DD.md`. Check which exists and
+  match it rather than assuming, and append under the vault's existing daily-note
+  heading for session links (commonly `### Notes` or `## Claude Sessions`) rather
+  than creating a new one.
 
 ## Notes
 

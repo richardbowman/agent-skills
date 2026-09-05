@@ -466,7 +466,3 @@ await prisma.post.update({
   },
 });
 ```
-
-## Reference
-
-Full guide at: `/Users/rbowman/Downloads/prisma-dsql-guide (8).md`

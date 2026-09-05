@@ -403,7 +403,3 @@ Many projects maintain both an authoritative full schema (e.g. `001-full-schema.
 - [ ] `INDEX ASYNC` stripping in migration runner is gated on `DATABASE_URL` being set, not unconditional
 - [ ] If migration runner has both an inline loop and a helper function, both have the same SQL transformation logic
 - [ ] Using `vercel curl --deployment <URL>` for protected preview environments, not plain `curl`
-
-## Reference
-
-Full guide at: `/Users/rbowman/Downloads/prisma-dsql-guide (8).md`
