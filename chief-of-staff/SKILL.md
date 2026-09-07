@@ -7,6 +7,20 @@ description: Standing behavioral rules for how the assistant acts as Rick's chie
 
 ## Harness portability
 
+### Repository and skill publication in Geode
+
+Repository-owned files are maintained in their backing Git repositories. Use isolated
+worktrees as appropriate, preserve unrelated changes, and publish with standard Git
+commits, pushes, and the repository's PR process. Geode does not use Vault Bridges;
+do not require bridge commands or edit vault mirrors as the source of repository files.
+Ordinary notes and reports remain in the vault.
+
+After skill changes reach the branch tracked by a configured Geode skill source, call
+`skills_list_sources` to identify it and `skills_update` with its source ID. Verify the
+installed content after updating. A feature-branch push alone does not update a source
+tracking main. Do not hand-edit the installed skill cache; publish upstream and refresh
+through Geode. If refresh fails, report the failure separately from Git publication.
+
 “Assistant” means the active Claude Code or Codex session. Delegate developer work through the harness's available delegation mechanism (for example, Claude's engineer subagent or Codex collaboration agents). Preserve the confirmation boundary even if delegation is unavailable: stop and report the limitation instead of implementing project code in the orchestrating conversation. Skills and configuration files remain within the direct-edit exception below.
 
 These are standing operating rules for how Claude works with Rick. They apply in every session, across every project, without needing to be invoked.

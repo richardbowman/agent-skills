@@ -221,8 +221,8 @@ a background subagent; a written report is the only durable record.
    `~/Documents/Personal/Attachments/QA/<Project>/<YYYY-MM-DD>-<slug>/` and
    embed it in the report with `![[Attachments/QA/<Project>/.../file.png]]`.
    "Verified visually" with no attached image does not satisfy this step.
-4. If the vault folder is bridged to this repo, run the `vault-bridge` skill
-   to sync after writing.
+4. Keep vault QA notes in the vault. Publish repository-owned documentation through
+   the repository's normal Git commit, push, and PR workflow.
 5. When you report completion of this checklist (to the user or to whoever
    spawned you as a subagent), state the exact vault path of the report you
    wrote — that path is the only proof the verification happened.
