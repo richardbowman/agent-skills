@@ -9,7 +9,7 @@ runner.
 | Task | Command |
 |---|---|
 | Portability and metadata tests | `node --test tests/*.test.mjs` |
-| TypeScript syntax | `node --check dream/scan.ts && node --check log-friction/log.ts` |
+| TypeScript syntax | `node --check log-friction/log.ts` |
 | Node helper syntax | `node --check worktree-bootstrap/worktree-bootstrap && node --check nextjs-local-dev/nextdev` |
 | Shell helper syntax | `for f in worktree-bootstrap/wtcc worktree-bootstrap/wtcc-status worktree-bootstrap/wtpr worktree-bootstrap/wtadd worktree-bootstrap/wtcc-recover rb-personal-assistant/scripts/jarvis-daily-triage-openclaw.sh rb-personal-assistant/scripts/jarvis-daily-triage.sh; do bash -n "$f" || exit 1; done` |
 | Diff hygiene | `git diff --check` |

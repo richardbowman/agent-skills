@@ -4,7 +4,7 @@ import {dirname, resolve} from "node:path";
 import test from "node:test";
 
 const skills = [
-  "brain-dump", "brainstorm", "chief-of-staff", "dream", "hiptrip-editor",
+  "brain-dump", "brainstorm", "chief-of-staff", "hiptrip-editor",
   "log-friction", "nextjs-local-dev", "pr-checklist",
   "production-readiness", "rb-personal-assistant", "remotion-video-ads", "stash",
   "verify-before-coding", "video-storyboard", "web-search", "worktree-bootstrap",
@@ -55,7 +55,6 @@ test("representative workflows state native alternatives without weakening behav
     "brain-dump": [/transcript export/i, /memory is optional/i],
     brainstorm: [/transcript export/i, /memory is optional/i],
     "chief-of-staff": [/available delegation mechanism/i, /skills and configuration files/i],
-    dream: [/CLAUDE\.md.*AGENTS\.md|AGENTS\.md.*CLAUDE\.md/s, /unsupported.*conversation-log/i],
     "log-friction": [/AGENT_STATE_HOME/, /skill directory/i],
     "nextjs-local-dev": [/background execution capability/i],
     "pr-checklist": [/\.claude\/pr-guidelines\.md/, /\.agents\/pr-guidelines\.md/],
@@ -72,7 +71,7 @@ test("representative workflows state native alternatives without weakening behav
 });
 
 test("bundled stateful scripts honor AGENT_STATE_HOME", () => {
-  for (const file of ["dream/scan.ts", "log-friction/log.ts"]) {
+  for (const file of ["log-friction/log.ts"]) {
     const text = readFileSync(file, "utf8");
     assert.match(text, /process\.env\.AGENT_STATE_HOME/, `${file}: state home is hard-coded`);
   }
