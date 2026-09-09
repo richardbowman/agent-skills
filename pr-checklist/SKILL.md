@@ -26,7 +26,9 @@ retrieval:
 Use the active harness's shell, file, test, browser, and image-inspection capabilities. Look for `.agents/pr-guidelines.md` and `.claude/pr-guidelines.md`; if both exist, merge compatible requirements and stop on conflicts. Harness hook formats are optional enforcement adapters—the checklist itself remains authoritative in Claude Code and Codex.
 
 A feature is NOT done until every item below passes. Do not open a PR, push to
-main, or mark a Linear issue In Review until this checklist is complete.
+main, or mark a Linear issue In Review until this checklist is complete. Once
+the checks finish, publish their QA summary in the GitHub PR as described in
+Step 7; the detailed vault report remains the durable evidence record.
 
 ## Step 0 — Load Per-Repo Guidelines
 
@@ -248,7 +250,59 @@ If the guidelines file specifies a screenshot command, or the project has a
 - Run after any UI change
 - Commit updated screenshots alongside the code change
 
-## Step 7 — Final PR Checklist
+## Step 7 — Publish the QA Report to the GitHub PR
+
+Build a concise Markdown summary from the checks actually run. Do not claim a
+check passed without its command output or other direct evidence. Include:
+
+- overall status: pass or fail
+- type-check, unit-test, and E2E commands with their results
+- visual viewports/modes checked, or `Not applicable — no UI changes`
+- docs and screenshot results
+- known gaps, skipped checks, or environment limitations
+- the exact vault path of the detailed QA report, when one was written
+
+Wrap the summary in stable markers so rerunning the checklist replaces the
+existing report instead of appending duplicates:
+
+```markdown
+<!-- qa-report:start -->
+## QA Report
+
+**Status:** PASS | FAIL
+
+| Check | Result | Evidence |
+|---|---|---|
+| Type-check | PASS | `<command>` — <result> |
+| Unit tests | PASS | `<command>` — <count/result> |
+| E2E tests | PASS | `<command>` — <count/result> |
+| Visual verification | N/A | No UI changes |
+| Docs/screenshots | PASS | <what was reviewed or regenerated> |
+
+**Known gaps:** None.
+
+**Detailed evidence:** `<vault-relative-or-absolute-path>`
+<!-- qa-report:end -->
+```
+
+Resolve whether the current branch already has a PR with `gh pr view`. Then:
+
+- **PR exists:** read its current body, replace the content between the QA
+  markers if present (otherwise append the marked block), and update the same
+  PR with `gh pr edit --body-file <file>`. Preserve every other part of the PR
+  body verbatim. Read the PR body back afterward and confirm the marked report
+  is present.
+- **No PR exists yet:** retain the complete marked block for the PR-creation
+  step. The `create-pr` skill must include it in the initial PR body and verify
+  it after creation. Do not open a PR merely because this checklist ran unless
+  opening one is already authorized by the user's request.
+
+If GitHub authentication, permissions, or network access prevents publication,
+report the exact failure and return the ready-to-paste marked block. Do not
+describe the GitHub QA report as published until the read-back verification
+succeeds.
+
+## Step 8 — Final PR Checklist
 
 Build the final checklist from the guidelines file if present; otherwise use
 these defaults. Present it to the user as a completed checklist with pass/fail
@@ -261,6 +315,8 @@ status for each item:
 - [ ] QA report written to the vault run note with embedded screenshots (if
       any tests were run or visual verification was performed) — state the
       path
+- [ ] GitHub PR body contains the current marked QA report, or the marked block
+      is ready for an authorized PR-creation step
 - [ ] Docs: reviewed and updated for any changed user-facing behavior
 - [ ] Screenshots: regenerated and committed (if project has screenshot tooling)
 - [ ] Linear issue: moved to **In Review**
