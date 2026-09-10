@@ -42,9 +42,18 @@ hasn't already passed.
 
    ## Test plan
    - [ ] <how to verify>
+
+   <!-- qa-report:start -->
+   ## QA Report
+   <the marked QA summary produced by pr-checklist>
+   <!-- qa-report:end -->
    EOF
    )"
    ```
+   If `pr-checklist` produced a marked QA block, include it verbatim in the
+   initial body. If no block is available, do not invent results: say which
+   checks are still pending. After creation, read the PR body back with
+   `gh pr view` and verify that the QA markers and report are present.
 6. **If the repo deploys to Vercel** (`vercel.json`, `.vercel/`, or a known
    Vercel project): use the `vercel-tools` skill's `vercel-wait-deploy`
    against this branch — never a hand-rolled polling loop — and capture the
