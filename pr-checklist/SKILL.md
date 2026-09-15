@@ -228,6 +228,63 @@ a background subagent; a written report is the only durable record.
 5. When you report completion of this checklist (to the user or to whoever
    spawned you as a subagent), state the exact vault path of the report you
    wrote — that path is the only proof the verification happened.
+6. **If this project uses Compass for product management, also publish the
+   report as a Compass Doc and link it to the Solution or Roadmap Item it
+   verifies.** Do this *in addition to* the vault note above, never instead of
+   it — Compass Docs are plain markdown with no image hosting, so screenshots
+   still have to live in the vault to actually render.
+
+   **Check whether this applies:** look for
+   `~/Documents/Personal/Products/<Project>/pm-config.md` (same `<Project>`
+   resolved in step 1). If it doesn't exist, or it has no `## Provider
+   Connections → Compass` section, skip the rest of this item — the vault
+   report is the complete record for this project.
+
+   **Resolve the org/workspace:** read `Org slug`, `Workspace slug`, and
+   `Workspace ID` from that Compass section. Get the MCP API key from the
+   location it names (env var or 1Password), same as the `compass-workflow`
+   skill.
+
+   **Resolve what this PR delivers against.** If a `compass-workflow` session
+   already set a Solution to `IN_DELIVERY` for this branch, use that
+   `solutionId`. Otherwise ask the user which Solution or Roadmap Item this PR
+   closes out — do not guess it from the branch name or commit messages.
+
+   **Create the doc:**
+   ```
+   create_doc(workspaceId,
+     title: "QA Report — <feature/PR title> — <YYYY-MM-DD HH:MM>",
+     content: <markdown — the same pass/fail table used in Step 7, plus a
+               closing line: "Screenshots and full detail: <vault-relative
+               path to the run note>">,
+     parentId: <id of a "QA Reports" doc — find it via list_docs; if it
+                doesn't exist yet, create it once as a root doc and reuse it
+                for every future report>)
+   ```
+
+   **Link it to the work it verifies:**
+   - **Solution known:** Compass Docs have no generic solution-link field
+     (that's reserved 1:1 for GTM Positioning Briefs), so link it by posting
+     to the Solution's Plan & Discussion thread instead:
+     `add_solution_comment(solutionId, body: "QA Report: <Compass doc URL> —
+     <PASS|FAIL>", authorName: "Claude Code")`.
+   - **Only a Roadmap Item is known, and it has no linked Solution** (check
+     `list_roadmap_items` — most do, since `promote_to_roadmap` sets one):
+     bridge the gap with a task, since Roadmap Items and Docs have no direct
+     link tool between them:
+     ```
+     create_task(workspaceId, title: "QA verification: <roadmap item title>")  → taskId
+     link_task(taskId, linkedType: "ROADMAP_ITEM", linkedId: roadmapItemId)
+     link_task(taskId, linkedType: "DOC", linkedId: docId)
+     ```
+
+   **Cross-reference both directions:** add a `Compass doc: <url>` line to the
+   vault run note's QA section, and make sure the Compass doc's content
+   points back at the vault run note path.
+
+   State the Compass doc URL and what it's linked to (Solution comment or
+   linking Task) alongside the vault path when reporting completion — same
+   durability rule as the vault path.
 
 ## Step 5 — Docs Review
 
@@ -261,6 +318,7 @@ check passed without its command output or other direct evidence. Include:
 - docs and screenshot results
 - known gaps, skipped checks, or environment limitations
 - the exact vault path of the detailed QA report, when one was written
+- the Compass doc URL and what it's linked to, when Step 4 item 6 applied
 
 Wrap the summary in stable markers so rerunning the checklist replaces the
 existing report instead of appending duplicates:
@@ -282,6 +340,7 @@ existing report instead of appending duplicates:
 **Known gaps:** None.
 
 **Detailed evidence:** `<vault-relative-or-absolute-path>`
+**Compass doc:** `<url, or "N/A — project not Compass-managed">`
 <!-- qa-report:end -->
 ```
 
@@ -315,6 +374,9 @@ status for each item:
 - [ ] QA report written to the vault run note with embedded screenshots (if
       any tests were run or visual verification was performed) — state the
       path
+- [ ] QA report published as a Compass Doc and linked to the relevant
+      Solution (or Roadmap Item via a linking Task) — if the project has
+      `pm-config.md` with a Compass connection; otherwise N/A
 - [ ] GitHub PR body contains the current marked QA report, or the marked block
       is ready for an authorized PR-creation step
 - [ ] Docs: reviewed and updated for any changed user-facing behavior
