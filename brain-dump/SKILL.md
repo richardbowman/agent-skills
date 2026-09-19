@@ -53,7 +53,7 @@ Before writing anything:
 
 ### Primary output — Obsidian note (always)
 
-**Vault location:** `~/Documents/Personal/`
+**Vault location:** the running vault — the runtime supplies its root. Every path below is vault-relative.
 
 Pick the right subfolder based on topic:
 
@@ -125,7 +125,7 @@ If the session captured a repeatable workflow the assistant should execute in th
 ## Phase 5: Wrap-up
 
 After saving:
-1. Add a wikilink to the new note in today's daily note (`~/Documents/Personal/Daily/YYYY-MM-DD.md`) under a `## Claude Sessions` section. Create the daily note if it doesn't exist.
+1. Add a wikilink to the new note in today's daily note (`Daily/YYYY-MM-DD.md`, vault-relative) under a `## Claude Sessions` section. Create the daily note if it doesn't exist.
 2. Tell the user the exact Obsidian path where you saved it
 3. Show a short preview (first 20 lines of the note)
 4. Ask if they want to capture anything else while in this mode

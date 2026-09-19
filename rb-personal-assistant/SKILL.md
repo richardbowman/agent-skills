@@ -18,7 +18,7 @@ This skill lets an AI assistant (Claude or Gemini) act as a proactive assistant 
 Run this whenever asked to triage the inbox, including scheduled/unattended runs. Use the `gws` CLI (already on PATH). Work the steps in order.
 
 **Key constants**
-- **Vault root:** `/Users/rickbowman/Library/Mobile Documents/com~apple~CloudDocs/Documents/Personal` — NOT `/Users/rickbowman/Documents/Personal`. That second path is a decoy directory (no `.obsidian/`, no `Daily/`, no `Products/`) that some earlier version of this file pointed at; writes there silently succeed but nothing reads them back. Every path below is vault-relative to the real root. Verify with `ls -d "$VAULT/.obsidian"` if ever in doubt.
+- **Vault paths:** every vault path below is vault-relative; the runtime supplies the vault root. Never hard-code one.
 - **Jarvis archive label:** `Label_9220311120338883160` — to archive, add this label AND remove `INBOX` in the same `modify` call.
 - **Inbox scan query:** `gws gmail +triage --query 'is:unread label:INBOX' --max 60`
 - **Context notes:** `Jarvis Summaries/triage-context.md`
