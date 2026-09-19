@@ -1,25 +1,283 @@
 ---
 name: e2e-local
-description: Run Playwright E2E tests locally for this project. Use whenever the user asks to run E2E tests, integration tests, or Playwright tests locally. Handles .env.e2e setup, ensures the dev server is pointing at local Postgres, and runs pnpm test:e2e.
+description: Run Playwright E2E tests locally in whatever repo you are currently in. Use whenever the user asks to run E2E tests, integration tests, or Playwright tests locally. Starts by detecting THIS repo's actual E2E setup (entry points, env file, database) — repos differ, and several have more than one suite — then covers the portable local-run failures (env secrets, dotenv in worktrees, output redirection, schema mismatch).
 ---
 
 # E2E local test runner
 
-Running E2E tests locally requires three things to line up:
+This skill does **not** know your repo's E2E layout. Layouts differ a lot between
+projects, and getting this wrong wastes an entire run: you seed the wrong
+database, run a suite that asserts nothing and call it green, or fail auth
+against a server holding different secrets.
 
-1. **`.env.e2e`** — exists and has secrets that match the running dev server
-2. **Dev server** — running with `DATABASE_URL` pointing at local Postgres (not DSQL)
-3. **Run tests** — `pnpm test:e2e`
+So the order is always:
 
-## Step 1 — ensure `.env.e2e` exists
+1. **Step 0 — detect this repo's E2E setup.** Never skip.
+2. **Step 1 — line up the environment** the detected entry point actually reads.
+3. **Step 2 — run it**, with output redirected to a file in the project dir.
 
-Check if `.env.e2e` exists in the worktree root:
+The worked examples near the bottom are *examples*. Do not copy commands out of
+them until Step 0 has confirmed they match the repo you are in.
+
+---
+
+## Step 0 — detect this repo's E2E setup (do this first)
+
+**A repo may have more than one E2E suite, with different entry points, different
+databases, and different meanings.** "The E2E tests pass" is not a single claim.
+One suite may capture screenshots with no assertions at all while another runs
+real DB-mutating assertions — running the first and reporting success is a false
+green.
+
+Work through these in order. Stop collecting once you can answer the four
+questions at the end.
+
+### 0a. Repo-local guidelines are authoritative where they exist
+
+```sh
+cat .claude/pr-guidelines.md 2>/dev/null
+cat .agents/pr-guidelines.md 2>/dev/null
+```
+
+If either exists, it wins over anything in this skill. It normally names each
+suite, what it covers, and when a PR is expected to run it.
+
+Treat specific numbers in those docs (ports especially) as possibly stale and
+confirm them against `playwright.config.ts` — a hardcoded port in prose tends to
+outlive the config change that moved it.
+
+### 0b. Enumerate the E2E entry points in `package.json`
+
+```sh
+node -e 'const s=require("./package.json").scripts||{};for(const[k,v]of Object.entries(s))if(/e2e|playwright|test:integration/i.test(k+v))console.log(k.padEnd(28),v)'
+```
+
+Every matching script is a candidate entry point. Note which ones shell out to a
+wrapper script (`node scripts/<something>.mjs`) rather than calling `playwright`
+directly — the wrapper is where env loading, DB preparation, locks, and safety
+guards live, and running bare `playwright test` bypasses all of it.
+
+### 0c. Read the wrapper and the Playwright config
+
+```sh
+sed -n '1,60p' scripts/<the-wrapper>.mjs   # whatever 0b surfaced
+cat playwright.config.ts
+```
+
+From these, extract:
+
+- **Which env file is loaded**, if any. Look for `process.loadEnvFile(...)`,
+  `dotenv -e <file>`, `dotenv-cli -e <file>`, or a `require("dotenv")` call.
+  Common values are `.env.local`, `.env.e2e`, `.env.test` — **do not assume**.
+- **Which Playwright projects exist** (`projects: [...]` in the config) and which
+  ones each script selects via `--project=`.
+- **Whether a `webServer` block starts a server**, and on what port. The port may
+  be derived rather than fixed — a repo running many concurrent worktrees may
+  hash the cwd into a port so worktrees cannot collide.
+- **`reuseExistingServer`** — if this is true locally, Playwright will silently
+  attach to any server already on that port, including another worktree's,
+  producing failures unrelated to your change.
+- **What each project's `baseURL` defaults to.** A suite pointed at a *deployed*
+  URL by default needs no local server at all, and running it locally without an
+  override tests production, not your branch.
+
+### 0d. Find the database the suite expects
+
+```sh
+grep -rniE 'database_url|compass_e2e|_e2e|createdb|db push|prepare.*database' \
+  scripts/ playwright.config.ts e2e/ 2>/dev/null | head -20
+podman ps --format '{{.Names}} {{.Ports}} {{.Status}}'
+```
+
+Some repos put a **guard** in the DB-preparation step that hard-refuses any
+target except one specific local database. That guard is a feature: it exists so
+a stray `DATABASE_URL` cannot drop or reshape your real dev data. If it throws,
+fix the URL — never weaken the guard.
+
+Note also whether the wrapper takes a **machine-wide run lock**. That is a
+separate mechanism from the DB guard: it serializes concurrent runs across
+worktrees so two agents don't exhaust memory and corrupt each other's fixtures.
+If you see "waiting for lock", wait — do not set the bypass env var to jump the
+queue.
+
+### 0e. Locate the specs
+
+```sh
+ls e2e/ 2>/dev/null; ls tests/ 2>/dev/null; ls playwright/ 2>/dev/null
+```
+
+Cross-check against each Playwright project's `testDir` / `testMatch`. A spec
+path that isn't inside the selected project's `testDir` will silently match
+nothing.
+
+### Before leaving Step 0, you must be able to answer
+
+1. How many E2E suites does this repo have, and what does each one actually
+   assert (if anything)?
+2. Which command runs the suite the user is asking about?
+3. Which env file does that command read, and does it exist in **this worktree**?
+4. Which database/server does it target, and is that target running?
+
+If you cannot answer all four, keep reading the repo. Do not start guessing with
+commands.
+
+---
+
+## Step 1 — line up the environment
+
+These failures are repo-independent. They are the reason this skill exists.
+
+### Secrets must match the server the browser logs into
+
+If the suite seeds a user directly into the DB and then logs in through the
+browser, the **seeding process and the running server must share the same auth
+secrets**.
+
+- `AUTH_SECRET` / `NEXTAUTH_SECRET` differing → NextAuth cannot verify the
+  session token and login fails with **`CredentialsSignin`**. The browser then
+  times out waiting for a post-login route, which reads like a UI bug and is not
+  one.
+- `ENCRYPTION_KEY` (or equivalent) differing → data encrypted during seeding
+  won't decrypt at runtime.
+
+If the suite uses a dedicated env file, derive those values *from* the file the
+dev server uses rather than inventing them:
+
+```sh
+grep '^AUTH_SECRET=' .env.local | cut -d= -f2- | tr -d '"'
+```
+
+If the server is started by Playwright's own `webServer` block, it inherits the
+same env the wrapper loaded, so this class of mismatch disappears — one more
+reason to use the repo's wrapper rather than bare `playwright test`.
+
+### Local Postgres needs `?sslmode=disable`
+
+Local Podman/Docker Postgres has no SSL configured. Without the suffix, Prisma
+throws `The server does not support SSL connections`.
+
+```
+postgresql://postgres:postgres@localhost:<port>/<db>?sslmode=disable
+```
+
+### Point the server at local Postgres, not a cloud DB
+
+If the dev server is still on the project's cloud database (DSQL, Neon, RDS)
+while the suite seeds into local Postgres, the seeded user does not exist when
+the browser tries to log in. Same `CredentialsSignin` symptom, different cause.
+
+Check what the running server is actually connected to before blaming the tests:
+
+```sh
+nextdev status
+nextdev logs -n 20
+```
+
+`worktree-bootstrap` handles deps, `.env.local`, the Postgres container, and
+`DATABASE_URL` injection in one step if the worktree is cold.
+
+---
+
+## Step 2 — run the tests
+
+### Always redirect output to a file **in the project directory**
+
+Do **not** capture Playwright output as shell/task output, and do **not** write
+it to `/tmp`. Playwright output with traces and screenshots can exceed what
+`/tmp` holds, producing `ENOSPC: no space left on device` — which surfaces as a
+confusing mid-run crash rather than a disk error.
+
+```sh
+mkdir -p test-results
+<the repo's e2e command> --reporter=line > test-results/pw-run.log 2>&1; echo "exit:$?"
+# then Read test-results/pw-run.log
+```
+
+`echo "exit:$?"` prints the exit code *after* redirection, so you can still tell
+pass from fail.
+
+### `dotenv: command not found` in a worktree — use `npx dotenv-cli`
+
+If the repo's script is shaped like `dotenv -e <file> -- playwright test`, it
+will fail in a git worktree: `dotenv` is a dev-dependency binary that pnpm does
+not always surface into the worktree's PATH.
+
+```sh
+# ❌ dotenv: command not found
+pnpm test:e2e
+
+# ✅ installs on demand, always resolves
+npx dotenv-cli -e .env.e2e -- npx playwright test --reporter=line
+```
+
+This does **not** apply to wrappers that load env in-process (e.g.
+`process.loadEnvFile(".env.local")` inside a `.mjs` script) — those have no PATH
+dependency, and substituting `npx dotenv-cli` for them skips the wrapper's DB
+preparation and locking. Use the repo's own entry point unless it actually
+breaks.
+
+### Reading a failure
+
+- `nextdev logs -n 50` — auth errors or DB connection failures during the run
+- `CredentialsSignin` — auth secret mismatch, or the server is on a different
+  database than the seed (see Step 1)
+- `ECONNREFUSED` on the Postgres port — container isn't running; `podman ps -a`
+  then `podman start <name>`
+- Browser times out waiting for a post-login route — the login failed; read the
+  server logs for what the credentials handler returned
+- `table X does not exist in current database` — see Schema mismatch below
+
+---
+
+## Schema mismatch — `table X does not exist in current database`
+
+A Playwright `db` fixture that builds a plain Prisma client from `DATABASE_URL`
+queries the **`public`** schema unless told otherwise. If the app's migration
+runner targets a named schema (`getActiveSchema()`, e.g. `myapp_dev`), newly
+migrated tables exist only there — so the fixture looks in `public` and finds
+nothing.
+
+**Do NOT fix this by applying DDL to `public`.** That fragments the schema and
+creates divergence between local and the deployed database, and the divergence
+resurfaces later as a migration that cannot be replayed.
+
+**The correct fix** is in the Prisma client factory — make the local path pass
+the same schema as the cloud path:
+
+```ts
+// Before (broken for E2E and local dev consistency):
+if (process.env.DATABASE_URL) {
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+  const adapter = new PrismaPg(pool)           // ← no schema = queries public
+  return new PrismaClient({ adapter })
+}
+
+// After (correct):
+if (process.env.DATABASE_URL) {
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+  const adapter = new PrismaPg(pool, { schema: getActiveSchema() })  // ← same schema everywhere
+  return new PrismaClient({ adapter })
+}
+```
+
+Then apply pending migrations through the app's migration endpoint and the
+fixture will find the tables in the schema the server uses.
+
+---
+
+## Example A — a repo with one suite and a dedicated `.env.e2e`
+
+**This is one possible shape, not the default.** It applies to a repo where
+Step 0 found: a single `pnpm test:e2e` script of the form
+`dotenv -e .env.e2e -- playwright test`, specs under `e2e/tests/`, and a local
+Postgres on `:5433/localdb`. Confirm each of those before using these commands.
+
+`.env.e2e` is gitignored, so it will not exist in a fresh worktree. Build it from
+`.env.local` so the secrets match the running dev server:
 
 ```sh
 ls .env.e2e 2>/dev/null && echo "exists" || echo "missing"
 ```
-
-If missing, create it by pulling `AUTH_SECRET` and `ENCRYPTION_KEY` from `.env.local` (these must match the running dev server):
 
 ```sh
 AUTH_SECRET=$(grep '^AUTH_SECRET=' .env.local | cut -d= -f2- | tr -d '"')
@@ -41,126 +299,114 @@ SCREENSHOTS_USER_PASSWORD=ScreenshotPassword123!
 EOF
 ```
 
-> **Why these must match the dev server:** The E2E global-setup seeds a user directly into the DB and then logs in via the browser. If `AUTH_SECRET` differs, NextAuth can't verify the session token and login fails with a `CredentialsSignin` error. If `ENCRYPTION_KEY` differs, any encrypted data written during seeding won't decrypt at runtime.
-
-> **Why `?sslmode=disable`:** Local Podman Postgres doesn't have SSL configured. Without this suffix Prisma throws "The server does not support SSL connections".
-
-## Step 2 — ensure dev server is on local Postgres
-
-The dev server must be connected to the same local Postgres that the E2E seed writes to. If it's running against DSQL (the default from `.env.local`), the seeded user won't exist when the browser tries to log in.
-
-Check what the running server is connected to:
+Do not hardcode the port or the base URL if the environment can tell you. Pull
+the real dev-server port instead:
 
 ```sh
-nextdev status
-nextdev logs -n 20
+PORT=$(nextdev status | grep 'port:' | awk '{print $2}')
+# then set PLAYWRIGHT_BASE_URL=http://localhost:${PORT}
 ```
 
-If the server is running without `DATABASE_URL` set (i.e., it's using DSQL from `.env.local`), restart it:
+Make sure the dev server is on the same local Postgres the seed writes to:
 
 ```sh
 nextdev restart --cmd "DATABASE_URL=postgresql://postgres:postgres@localhost:5433/localdb?sslmode=disable pnpm dev"
+nextdev logs -n 30   # wait for "Ready"
 ```
 
-Or if it's not running at all, use `worktree-bootstrap` which handles everything (deps, .env.local, Postgres container, DATABASE_URL injection):
+Run it:
 
 ```sh
-worktree-bootstrap
-```
-
-Wait for the "Ready" line before proceeding:
-
-```sh
-nextdev logs -n 30
-```
-
-## Step 3 — run the tests
-
-Run via `npx` to avoid the `dotenv: command not found` failure that occurs when `pnpm test:e2e` tries to shell out to a `dotenv` binary that isn't in PATH in a worktree.
-
-**Always redirect output to a file in the project directory** — do NOT capture Playwright output as task/shell output. Playwright's output can be very large and writing it to `/tmp` can cause `ENOSPC` failures when the temp filesystem is low on space.
-
-```sh
-# ✅ Correct — write output to project dir, then read it back
 mkdir -p test-results
 npx dotenv-cli -e .env.e2e -- npx playwright test --reporter=line > test-results/pw-run.log 2>&1; echo "exit:$?"
 
-# Then read results:
-# Read test-results/pw-run.log
-```
-
-```sh
-# Run a subset by file or grep:
+# subset by file or grep:
 npx dotenv-cli -e .env.e2e -- npx playwright test e2e/tests/02-estate.spec.ts --reporter=line > test-results/pw-run.log 2>&1; echo "exit:$?"
 npx dotenv-cli -e .env.e2e -- npx playwright test --grep "some test name" --reporter=line > test-results/pw-run.log 2>&1; echo "exit:$?"
 ```
 
-> **Why redirect to a file?** Playwright output (especially with traces/screenshots) can exceed what `/tmp` can hold, triggering `ENOSPC: no space left on device`. Writing to `test-results/` in the project directory avoids this. The `echo "exit:$?"` prints the exit code after redirection so you can tell pass/fail.
+**Keeping `.env.e2e` in sync:** it is gitignored and does not track `.env.local`.
+After a `vercel env pull`, its `AUTH_SECRET` / `ENCRYPTION_KEY` can go stale and
+tests start failing with auth errors. Regenerate it with the commands above.
 
-> **Why not `pnpm test:e2e`?** The npm script is `dotenv -e .env.e2e -- playwright test`. In a worktree, `dotenv` (the CLI wrapper installed as a dev dependency) isn't surfaced into PATH by pnpm. `npx dotenv-cli` installs it on demand and always works.
+---
 
-All tests should pass. If they don't, check:
+## Example B — a repo with several suites, `.env.local`, and a guarded E2E database
 
-- `nextdev logs -n 50` — look for auth errors or DB connection failures during the test run
-- The `CredentialsSignin` error means `.env.e2e`'s `AUTH_SECRET` doesn't match the server's — re-check step 1
-- `ECONNREFUSED` on `:5433` means the Podman Postgres container isn't running — `podman start localdb-pg` (or whatever the container is named; check with `podman ps -a`)
-- If the browser times out waiting for `/dashboard`, the login failed — check the dev server logs for what the credentials auth handler returned
-- **`table X does not exist in current database`** — see "Schema mismatch" section below
+**This is the Compass shape** (`~/projects/compass`), verified 2026-09-19. It
+looks nothing like Example A, which is the whole point of Step 0.
 
-## All together (clean run from scratch)
+Step 0 on this repo finds **four** E2E entry points, not one:
+
+| Script | Command | What it means |
+|---|---|---|
+| `pnpm test:e2e` | `playwright test --project=screenshots` | Docs screenshots. **No assertions.** Green here proves nothing about behavior. |
+| `pnpm test:e2e:functional` | `node scripts/run-functional-e2e.mjs functional` | The real suite: assertions, DB mutations. |
+| `pnpm test:e2e:roadmap` | `node scripts/run-functional-e2e.mjs roadmap` | Three roadmap/timeline specs only. |
+| `pnpm test:e2e:all` | `node scripts/run-functional-e2e.mjs all` | Every Playwright project, screenshots included. |
+
+If the user asks whether "the E2E tests pass", they mean
+`pnpm test:e2e:functional`. Reporting `pnpm test:e2e` green is a false green.
+
+**The screenshots suite defaults to production.** Its `baseURL` falls back to
+`https://compass.rbcodelabs.com`, so it needs no local server — and run with no
+overrides it is testing production, not your branch. To regenerate screenshots
+against local dev, override `DOCS_BASE_URL` and supply a captured session; see
+`.claude/pr-guidelines.md`, which carries the current recipe.
+
+**Env file: `.env.local`, not `.env.e2e`.** `scripts/run-functional-e2e.mjs`
+opens with:
+
+```js
+process.loadEnvFile(path.resolve(process.cwd(), ".env.local"));
+```
+
+That is in-process, so there is no `dotenv` binary and no PATH problem — but the
+worktree must have its own `.env.local` with a real `DATABASE_URL`. Use
+`worktree-bootstrap` to get one.
+
+**Database: local `compass_e2e` on port 5437**, guarded.
+`scripts/prepare-e2e-database.mjs` refuses anything else:
+
+```js
+if (!LOCAL_HOSTS.has(target.hostname) || database !== "compass_e2e") {
+  throw new Error("Database preparation refuses any target except local compass_e2e");
+}
+```
+
+Note the two databases on that container are distinct: `compass` is dev data,
+`compass_e2e` is the disposable E2E target. Inside `compass_e2e` the suite
+pushes the Prisma schema into a `compass_dev` **schema** and drops a sentinel row
+in `public.e2e_database_sentinel`. If the guard throws, correct `DATABASE_URL` —
+do not edit the guard.
+
+**Separately, a machine-wide run lock.** `run-functional-e2e.mjs` takes a mutex
+at `$TMPDIR/compass-e2e-functional.lock` so only one functional run happens per
+machine. This is *not* the database guard — it exists because two concurrent
+runs in different worktrees each boot a dev server and a browser group, and on
+2026-09-17 that drove swap to 8.4 GB of 9.2 GB and took the machine down. Default
+behavior is to **wait** (30 min), printing `[e2e-lock] Waiting for…`. Wait it
+out. `E2E_SKIP_LOCK=1` exists but bypassing it is what crashed the machine.
+
+**Specs: `e2e/functional/specs/`** (57 files), with `e2e/functional/auth.setup.ts`
+as the `functional-setup` project and `e2e/functional/global-setup.ts` /
+`global-teardown.ts` doing seed and cleanup.
+
+**Port is derived, not fixed.** `playwright.config.ts` hashes `process.cwd()`
+into the range 4100–4899 rather than using a fixed port, precisely so concurrent
+worktrees cannot collide. Any doc still saying "port 3002" is stale —
+`.claude/pr-guidelines.md` currently does. `E2E_PORT` overrides if set.
+
+Run it:
 
 ```sh
-# 1. Bootstrap the worktree (installs deps, copies .env.local, starts Postgres, starts nextdev with local DB)
-worktree-bootstrap
-
-# 2. Create .env.e2e if missing (copy secrets from .env.local, point to local Postgres)
-#    … see Step 1 above
-
-# 3. Run tests (write output to project dir, then Read test-results/pw-run.log)
 mkdir -p test-results
-npx dotenv-cli -e .env.e2e -- npx playwright test --reporter=line > test-results/pw-run.log 2>&1; echo "exit:$?"
+pnpm test:e2e:functional > test-results/pw-run.log 2>&1; echo "exit:$?"
+
+# keep DB state for post-failure inspection:
+E2E_SKIP_TEARDOWN=1 pnpm test:e2e:functional > test-results/pw-run.log 2>&1; echo "exit:$?"
 ```
 
-## Step 1 — derive the correct DATABASE_URL and PLAYWRIGHT_BASE_URL
-
-Do not hardcode `:5433/localdb` or `:3000` in `.env.e2e`. Pull the real values from the running environment:
-
-```sh
-# Get the actual port the dev server is on
-PORT=$(nextdev status | grep 'port:' | awk '{print $2}')
-
-# Get the actual DB URL from the running server (worktree-bootstrap sets it)
-# Use the same URL the dev server was started with — check nextdev logs if unsure
-```
-
-Set `PLAYWRIGHT_BASE_URL=http://localhost:${PORT}` in `.env.e2e`.
-
-## Schema mismatch — `table X does not exist in current database`
-
-The E2E Playwright `db` fixture creates a plain Prisma client connected to local Postgres. If `lib/prisma.ts` routes the local `DATABASE_URL` path without a `schema` option, that client queries `public`. But the `/api/admin/migrate` runner targets `getActiveSchema()` (e.g. `myapp_dev`), so newly migrated tables only exist in `myapp_dev` — not `public`.
-
-**Do NOT fix this by applying DDL to `public`.** That fragments the schema and creates divergence between local and DSQL.
-
-**The correct fix** is in `lib/prisma.ts` — make the local path pass the same schema as the DSQL path:
-
-```ts
-// Before (broken for E2E and local dev consistency):
-if (process.env.DATABASE_URL) {
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL })
-  const adapter = new PrismaPg(pool)           // ← no schema = queries public
-  return new PrismaClient({ adapter })
-}
-
-// After (correct):
-if (process.env.DATABASE_URL) {
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL })
-  const adapter = new PrismaPg(pool, { schema: getActiveSchema() })  // ← same schema everywhere
-  return new PrismaClient({ adapter })
-}
-```
-
-Once `lib/prisma.ts` is patched, apply any pending migrations via `/api/admin/migrate` and the E2E fixture will find tables in the same schema the dev server uses.
-
-## Keeping `.env.e2e` in sync
-
-`.env.e2e` is gitignored. If `.env.local` changes (e.g. after a `vercel env pull`), the `AUTH_SECRET` and `ENCRYPTION_KEY` in `.env.e2e` may become stale. If tests start failing with auth errors after a pull, regenerate `.env.e2e` using the step 1 commands above.
+Use the wrapper, not bare `playwright test` — bypassing it skips database
+preparation, the lock, and the `CI=1` / `E2E_FUNCTIONAL=1` /
+`E2E_ISOLATED_DATABASE=1` env the config keys off.
