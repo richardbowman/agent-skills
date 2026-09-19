@@ -18,34 +18,50 @@ This skill lets an AI assistant (Claude or Gemini) act as a proactive assistant 
 Run this whenever asked to triage the inbox, including scheduled/unattended runs. Use the `gws` CLI (already on PATH). Work the steps in order.
 
 **Key constants**
+- **Vault root:** `/Users/rickbowman/Library/Mobile Documents/com~apple~CloudDocs/Documents/Personal` — NOT `/Users/rickbowman/Documents/Personal`. That second path is a decoy directory (no `.obsidian/`, no `Daily/`, no `Products/`) that some earlier version of this file pointed at; writes there silently succeed but nothing reads them back. Every path below is vault-relative to the real root. Verify with `ls -d "$VAULT/.obsidian"` if ever in doubt.
 - **Jarvis archive label:** `Label_9220311120338883160` — to archive, add this label AND remove `INBOX` in the same `modify` call.
 - **Inbox scan query:** `gws gmail +triage --query 'is:unread label:INBOX' --max 60`
-- **Context notes:** `/Users/rickbowman/Documents/Personal/Jarvis Summaries/triage-context.md`
-- **Action Items folder:** `/Users/rickbowman/Documents/Personal/Jarvis Summaries/Action Items/`
-- **Action Items Base** (already exists — never recreate): `/Users/rickbowman/Documents/Personal/Jarvis Summaries/Email Action Items.base`
-- **Summaries folder:** `/Users/rickbowman/Documents/Personal/Jarvis Summaries/`
-- **Daily notes:** `/Users/rickbowman/Documents/Personal/Daily/<YYYY-MM-DD>.md`
+- **Context notes:** `Jarvis Summaries/triage-context.md`
+- **Action Items folder:** `Jarvis Summaries/Action Items/`
+- **Action Items Base** (already exists — never recreate): `Jarvis Summaries/Email Action Items.base`
+- **Summaries folder:** `Jarvis Summaries/`
+- **Daily notes:** `Daily/<YYYY-MM-DD>.md`
 - **gws caveat:** label parameters must be plain strings, not arrays — e.g. `addLabelIds: "Label_9220311120338883160"`, `removeLabelIds: "INBOX"`.
+- **zsh caveat:** this environment's shell is zsh, not bash. `for x in $VAR; do` does NOT word-split unquoted variables in zsh (unlike bash) — a multi-id loop built that way silently runs once with the whole string as `$x`. Use a zsh array instead: `IDS=(id1 id2 id3); for id in "${IDS[@]}"; do ...`. Also, `status` is a zsh read-only builtin variable — never name a shell variable `status` (use `st` or similar) or assignment fails.
 
 ### STEP 0 — Read context notes
 Read the context-notes file. These are notes from Rick about things he has already handled or wants treated differently this run — factor them into every decision below. After the run, remove any notes you acted on (edit the Pending Notes section). If a note should become a permanent rule, add it to `references/preferences.md` instead of leaving it in the context file.
 
 ### STEP 0b — Deduplicate against prior runs AND the Action Items Base
-1. `ls "/Users/rickbowman/Documents/Personal/Jarvis Summaries/Triage-$(date +%Y-%m-%d)"*.md 2>/dev/null` — if any exist, read them and extract every subject/sender already under **Action Required** and every newsletter already under **Newsletter Highlights**.
-2. `ls "/Users/rickbowman/Documents/Personal/Jarvis Summaries/Action Items/"` and, for any email you are about to flag, check for an existing tracking note by Gmail id: `grep -rl "gmail_id: <ID>" "/Users/rickbowman/Documents/Personal/Jarvis Summaries/Action Items/"`.
+1. `ls "Jarvis Summaries/Triage-$(date +%Y-%m-%d)"*.md 2>/dev/null` (relative to vault root) — if any exist, read them and extract every subject/sender already under **Action Required** and every newsletter already under **Newsletter Highlights**.
+2. `ls "Jarvis Summaries/Action Items/"` and, for any email you are about to flag, check for an existing tracking note by Gmail id: `grep -rl "gmail_id: <ID>" "Jarvis Summaries/Action Items/"`.
 
 If something was already reported today, or already has an open action-item note, do not repeat it in the summary and do not create a duplicate note — only update the existing note (STEP 5b), unless there is genuinely new information (a reply, an update, a different email on the same topic).
 
 ### STEP 0c — Process pending Base actions
 The Action Items Base has an `archive` checkbox column (Rick ticks it in Obsidian). Before scanning the inbox, sweep for pending actions:
 
-1. `grep -l "^archive: true" "/Users/rickbowman/Documents/Personal/Jarvis Summaries/Action Items/"*.md` (also match `archive: true` without the caret in case of indentation differences).
+1. `grep -l "^archive: true" "Jarvis Summaries/Action Items/"*.md` (also match `archive: true` without the caret in case of indentation differences).
 2. For each match, read the note's frontmatter. Skip it if `status` is already `Done` or `Dismissed` (already processed on a prior run — nothing to do).
 3. Otherwise archive the underlying email: `gws gmail users messages modify --params '{"userId": "me", "id": "<gmail_id>", "addLabelIds": "Label_9220311120338883160", "removeLabelIds": "INBOX"}'`.
 4. On success, update the note's frontmatter: set `status: Dismissed` and `last_run` to now. Leave `archive: true` in place as the record of the action — do not uncheck it.
 5. On failure (e.g. message already deleted), leave `status` as-is, do not retry endlessly, and note the failure under a **Errors** line in this run's triage summary (STEP 7) so Rick sees it.
 
 This step is the only thing that closes the loop on the checkbox — checking it in Obsidian does nothing to the actual Gmail message until the next scheduled triage run picks it up (every 6h, 07:00-22:00).
+
+### STEP 0d — Age out stale tracked items
+
+The Action Items Base only ever grows unless something actively closes a note — STEP 0c requires Rick to notice and check a box, which doesn't scale (by 2026-09-18 it had reached 274 notes, 253 still `Open`, some from six weeks prior). This step runs every triage and closes notes automatically wherever it's safe to infer the item is no longer live, so the Base stays a reliable list of things that actually still need Rick's attention.
+
+1. **List every `Open` note's `gmail_id`** in `Jarvis Summaries/Action Items/`.
+2. **Pull the current full inbox id set** (not just unread): `gws gmail users messages list --params '{"userId": "me", "q": "in:inbox", "maxResults": 500}'`. If the response includes `nextPageToken`, repeat with `pageToken` set until it stops, so the full inbox is covered (it routinely exceeds 500).
+3. **Close any `Open` note whose `gmail_id` is no longer in that set.** If the underlying email isn't in the inbox at all anymore, Rick (or something else) already dealt with it outside this flow — the note is orphaned. Set `status: Dismissed`, leave `archive: false` (nothing left to archive), and append a line to the note body: `**Auto-closed <today's date>:** underlying email no longer in inbox — resolved outside the triage flow.` Do not touch notes whose email is still sitting in the inbox; those still need a human look.
+4. **Age out category-specific noise for notes still in the inbox:**
+   - **`CI/CD`:** if `first_seen` is more than 5 days ago and the note has never been updated to `In Progress`/`Done` by Rick, treat it as stale (CI failures are always superseded by the next run or a direct look at the repo — a week-old tracking note has no informational value). Archive the email (Jarvis label) and set `status: Dismissed`, noting `**Auto-closed <date>:** CI/CD notice unresolved after 5+ days, treated as stale — check the repo directly if still relevant.`
+   - **`Appointment`:** if `due_date` (or `email_date` when no `due_date`) is in the past, the appointment has already happened or passed — archive the email and dismiss with `**Auto-closed <date>:** appointment date has passed.`
+   - **Shipping/delivery notices filed under `Other`** (subject matches "package"/"delivery"/"shipped"/"on the way"): if more than 10 days old, archive and dismiss with `**Auto-closed <date>:** shipping window has elapsed.` (Better: per STEP 5b, file these as already-closed at creation time so this never has to catch one — see note there.)
+   - Leave `Billing`, `Security`, `Compliance`, `Invoice`, `Benefits`, `Opportunity`, `Solar`, `SEO`, and `Account` alone here — those categories can carry real money, deadlines, or judgment calls, so only step 3's inbox-presence check applies to them; never age them out on a timer.
+5. **Report counts, not a per-item list**, in the triage summary (STEP 7) — e.g. `Housekeeping: closed 14 stale notes (9 no longer in inbox, 4 aged CI/CD, 1 past-due appointment).` A full itemized list isn't useful signal; the count confirms the sweep ran.
 
 ### STEP 1 — Scan unread messages
 Run the inbox scan query above. (Note: plain `gws gmail +triage` with no query defaults to `is:unread` across the whole mailbox, capped at 20 — it misses the real inbox backlog because already-archived-but-still-unread mail crowds out true inbox items. Always pass the explicit `label:INBOX` query so this scans the actual inbox.)
@@ -60,7 +76,7 @@ Move Condominium Association / building emails to the **Home** label.
 Scan newsletters (WBEZ, Block Club, City Cast, etc.) for snippets matching Rick's interests: smoked meats, bread, cycling, home automation, Linux, SW Michigan local, Costa Rica / Portugal travel (full interest map in `references/preferences.md`). Summarize any hits, then archive the newsletter (jarvis label). SKIP any newsletter already summarized today (STEP 0b) — just archive it silently.
 
 ### STEP 5 — Flag Action Required
-Flag: invoices from priority contacts, production / billing / security alerts, compliance / attestation deadlines, appointment prep, and paid opportunities. Skip anything the context notes say Rick already handled. SKIP anything already reported today or already tracked by an open action-item note (STEP 0b), unless there is genuinely new information. Pure shipping / tracking notifications ("your order has shipped") are reported once, then archived.
+Flag: invoices from priority contacts, production / billing / security alerts, compliance / attestation deadlines, appointment prep, and paid opportunities. Skip anything the context notes say Rick already handled. SKIP anything already reported today or already tracked by an open action-item note (STEP 0b), unless there is genuinely new information. Pure shipping / tracking notifications ("your order has shipped") are reported once, then archived — file their tracking note as **already closed** (`status: Dismissed`, `archive: true`) at creation time in STEP 5b rather than `Open`, since there's no follow-up action for a shipping notice to wait on. Leaving these `Open` is exactly the kind of note STEP 0d has to clean up later for no reason.
 
 ### STEP 5b — Maintain the Action Items Base
 For each item flagged in STEP 5, ensure it is tracked as a note in the Action Items folder so it appears in the **Email Action Items** Base. The Base file already exists — do NOT recreate it.
@@ -95,10 +111,10 @@ Body: an H1 `# <Sender> — <subject>`, a 1–2 sentence description of the acti
 Do NOT archive travel emails (Marriott, AC Hotels, UPS, airlines) until the trip is confirmed over. See Travel & Trip Reporting below.
 
 ### STEP 7 — Write the triage summary
-Write to `/Users/rickbowman/Documents/Personal/Jarvis Summaries/Triage-<YYYY-MM-DD-HH-MM>.md` with sections: **Action Required**, **Newsletter Highlights**, **Archived**. Under Action Required, note that items are also tracked in the [[Jarvis Summaries/Email Action Items.base|Email Action Items]] Base. If STEP 0c processed any checkbox actions, add an **Archived via Base** line listing them, and an **Errors** line for any that failed. If nothing new was found, write a brief "No new items since last run" note and stop.
+Write to `Jarvis Summaries/Triage-<YYYY-MM-DD-HH-MM>.md` with sections: **Action Required**, **Newsletter Highlights**, **Archived**, **Housekeeping**. Under Action Required, note that items are also tracked in the [[Jarvis Summaries/Email Action Items.base|Email Action Items]] Base. If STEP 0c processed any checkbox actions, add an **Archived via Base** line listing them, and an **Errors** line for any that failed. Under Housekeeping, report the STEP 0d close-out counts. If nothing new was found, write a brief "No new items since last run" note (STEP 0d housekeeping still runs and gets reported) and stop.
 
 ### STEP 8 — Link in the daily note
-Add a wikilink to the summary file in `/Users/rickbowman/Documents/Personal/Daily/<YYYY-MM-DD>.md` under a `## Claude Sessions` section (create the section if missing).
+Add a wikilink to the summary file in `Daily/<YYYY-MM-DD>.md` under a `## Claude Sessions` section (create the section if missing).
 
 > Scheduled/unattended runs: complete STEP 0–8 and stop — no need to post the summary anywhere else.
 
