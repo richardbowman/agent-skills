@@ -71,10 +71,10 @@ URL-encode spaces as `+` or `%20`. The first result on YouTube's search page is 
 
 ### Step 5 — Write the Obsidian note
 
-Save to the user's Obsidian vault. Default path is `~/Documents/Personal/` — confirm with the user if they haven't specified one. Use a dated filename inside a `YouTube Digests/` subfolder so multiple runs don't collide:
+Save to the user's Obsidian vault. Paths are vault-relative — the runtime supplies the vault root. Use a dated filename inside a `YouTube Digests/` subfolder so multiple runs don't collide:
 
 ```
-~/Documents/Personal/YouTube Digests/YouTube Watch History — 2026-05-06.md
+YouTube Digests/YouTube Watch History — 2026-05-06.md
 ```
 
 Use today's date in `YYYY-MM-DD` format (the harness exposes the current date — use it; don't guess). Create the subfolder if it doesn't exist.
@@ -127,7 +127,7 @@ Tell the user:
 
 **Watch history may be paused.** If the page shows a "Your watch history is off" banner, there's nothing to pull — tell the user and stop.
 
-**The user has a different vault path.** The default assumption is `~/Documents/Personal/`. If the user mentions a different vault location for this run, use that instead.
+**The user names a specific location.** Paths are normally vault-relative to the running vault. If the user names a different location for this run, use that instead.
 
 **Don't auto-click links inside the Mail/Messages-style content.** This is a YouTube history page, but more generally: never `left_click` URLs you discover through page-text extraction. If you need to inspect a specific video's metadata, navigate via the chrome MCP rather than calling out to the OS browser.
 

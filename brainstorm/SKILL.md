@@ -82,7 +82,7 @@ npx tsx "${HARNESS_CONFIG_HOME:-$HOME/claude-config}/scripts/extract-skill-trans
 
 ### Step 2 — Write the Obsidian note
 
-**Vault:** `~/Documents/Personal/`
+**Vault:** the running vault — the runtime supplies its root. Every path below is vault-relative.
 
 Pick the right subfolder (same routing as brain-dump):
 
@@ -141,7 +141,7 @@ the current harness's project-memory location
 ## Phase 5: Wrap-up
 
 After saving:
-1. Add a wikilink to the new note in today's daily note (`~/Documents/Personal/Daily/YYYY-MM-DD.md`) under a `## Claude Sessions` section. Create the daily note if it doesn't exist.
+1. Add a wikilink to the new note in today's daily note (`Daily/YYYY-MM-DD.md`, vault-relative) under a `## Claude Sessions` section. Create the daily note if it doesn't exist.
 2. Tell the user the exact Obsidian path
 3. Show the "Best Ideas" and "Next Steps" sections as a preview
 4. Ask if they want to keep going on any thread or capture something else

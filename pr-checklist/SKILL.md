@@ -211,7 +211,7 @@ chat.** Chat summaries are invisible to the user when this skill runs inside
 a background subagent; a written report is the only durable record.
 
 1. Find or create today's per-run vault note:
-   `~/Documents/Personal/Products/<Project>/Runs/<project-slug>-<YYYY-MM-DD>-*.md`
+   `Products/<Project>/Runs/<project-slug>-<YYYY-MM-DD>-*.md` (vault-relative)
    (project name from the repo directory/`package.json`, capitalized —
    e.g. `compass` → `Compass`). Append to today's note if one exists (most
    recently modified if several); otherwise create
@@ -220,7 +220,7 @@ a background subagent; a written report is the only durable record.
    checked: pass/fail against the four bullets above, and what was actually
    different if something failed and got fixed.
 3. **Embed real screenshots, not descriptions.** Save each one under
-   `~/Documents/Personal/Attachments/QA/<Project>/<YYYY-MM-DD>-<slug>/` and
+   `Attachments/QA/<Project>/<YYYY-MM-DD>-<slug>/` (vault-relative) and
    embed it in the report with `![[Attachments/QA/<Project>/.../file.png]]`.
    "Verified visually" with no attached image does not satisfy this step.
 4. Keep vault QA notes in the vault. Publish repository-owned documentation through
@@ -235,7 +235,7 @@ a background subagent; a written report is the only durable record.
    still have to live in the vault to actually render.
 
    **Check whether this applies:** look for
-   `~/Documents/Personal/Products/<Project>/pm-config.md` (same `<Project>`
+   `Products/<Project>/pm-config.md` (same `<Project>`
    resolved in step 1). If it doesn't exist, or it has no `## Provider
    Connections → Compass` section, skip the rest of this item — the vault
    report is the complete record for this project.
