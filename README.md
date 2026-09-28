@@ -33,6 +33,7 @@ This existing bootstrap installs only into Claude Code: it symlinks every skill 
 | `log-friction` | Log agent-side operational friction (wrong turns, stale docs, wasted retries) for the separately installed `agent-dream` skill to consolidate |
 | `nextjs-local-dev` | Run/monitor Next.js dev servers via the `nextdev` CLI |
 | `podman-postgres` | Local Postgres via Podman |
+| `proxmox-devbox` | Use homelab Proxmox VMs as default offload for dev Postgres and heavy build/test steps, with automatic local fallback; includes a Proxmox infra reference (cloud-init template, GPU passthrough for local LLMs) |
 | `production-readiness` | Production readiness checklist and review |
 | `rb-personal-assistant` | Gmail triage, drafting, newsletters, travel planning |
 | `remotion-video-ads` | End-to-end Remotion video production — TTS, Whisper sync, landing page embed |
