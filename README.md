@@ -22,6 +22,7 @@ This existing bootstrap installs only into Claude Code: it symlinks every skill 
 | `backup-vercel-secrets` | Back up Vercel env vars to 1Password |
 | `brain-dump` | Structured knowledge extraction — the assistant interviews you and saves to Obsidian |
 | `brainstorm` | Active ideation partner — angles, frameworks, structured Obsidian output |
+| `cmux-workspace-table` | Table of the workspaces in the current CMUX window: task titles, working directories, worktree paths |
 | `content-marketing` | Content strategy and marketing copy recipes |
 | `dsql` | Build with Aurora DSQL — schemas, queries, DSQL-specific patterns |
 | `dsql-migrate` | Generate and apply Prisma migrations for Aurora DSQL |
