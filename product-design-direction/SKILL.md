@@ -1,3 +1,8 @@
+---
+name: product-design-direction
+description: "Set a distinctive visual design direction before writing UI code: for a new web product or feature area, a design overhaul, or a UI that feels generic or like default SaaS. Use before any UI implementation work."
+---
+
 # Product Design Direction
 
 ## When to use this skill
