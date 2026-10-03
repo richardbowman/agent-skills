@@ -1,7 +1,7 @@
 ---
 name: vercel-tools
 description: >-
-  Vercel CLI recipes — env vars, migrations, deployment status, build debugging,
+  Vercel recipes (MCP-first, no CLI) — env vars, migrations, deployment status, build debugging,
   runtime logs, and secrets workflow. INVOKE PROACTIVELY (do not wait for the
   user to ask) whenever: (1) setting or reading Vercel env vars, (2) a Vercel
   build or deployment has failed, (3) making any curl/fetch call to a *.vercel.app
@@ -14,6 +14,16 @@ description: >-
 
 # Vercel Tools
 
+## Tooling: MCP first, no `vercel` CLI
+
+The `vercel` CLI is retired for agent use. Use:
+- **Vercel MCP** (`mcp__vercel__*`; load schemas with ToolSearch) for deployments (`list_deployments`, `get_deployment`), build logs (`list_deployment_events`), runtime logs, projects/domains, and env var writes (`create_project_env`, `edit_project_env`, `filter_project_envs`). Verify the exact tool names/params via ToolSearch before calling — never guess.
+- **`vercel-env-pull`** (this folder) in place of `vercel env pull`: `vercel-env-pull --cwd $MAIN_REPO --environment development --out .env.local --yes`. Writes secrets straight to disk (mode 600), never into the transcript. Sensitive vars come back empty and are listed by name.
+- **`vercel-wait-deploy`** for waiting on a deploy (REST API).
+- If the MCP fails to connect (401), tell the user to re-authorize it; don't fall back to the CLI silently.
+
+---
+
 ## When to invoke (agent-proactive — do not wait to be asked)
 
 Invoke this skill immediately, before attempting any fix, whenever you detect:
@@ -24,7 +34,7 @@ Invoke this skill immediately, before attempting any fix, whenever you detect:
 | Setting any env var on a Vercel project | Read "Adding env vars via CLI" — `echo` stores empty strings |
 | Making `curl` to a `*.vercel.app` URL | Stop — read "Preview deployments are behind Vercel SSO" first |
 | Code task transitions into deployment work | Switch context; treat as a new Vercel task |
-| Any mention of `vercel env`, `vercel deploy`, `vercel logs` | Read the relevant section before running the command |
+| Any mention of Vercel env, deploy, or logs | Read the relevant section; use the Vercel MCP tools, not the `vercel` CLI |
 | Adding a new internal/admin API endpoint | Read "Layered auth checklist" below |
 | Turbopack build errors referencing generated files | Read "Turbopack + generated artifacts" below |
 
@@ -36,7 +46,7 @@ Invoke this skill immediately, before attempting any fix, whenever you detect:
 
 1. Run `vercel-wait-deploy --cwd $MAIN_REPO --target preview` (do not ask the user first)
 2. Post the resulting preview URL to the user as soon as the deployment is ready
-3. If the deployment fails, immediately run `vercel inspect <url> --logs` and diagnose — do not wait to be asked
+3. If the deployment fails, immediately fetch build logs via the Vercel MCP (`list_deployment_events`) and diagnose — do not wait to be asked
 
 This applies whether you pushed a fix, a new feature, or a single-line change. The user should never have to ask "what's the URL?" after a push.
 
@@ -46,7 +56,7 @@ This applies whether you pushed a fix, a new feature, or a single-line change. T
 
 When adding any endpoint that must be reachable without a user session, audit **every** layer independently — fixing one does not fix the others:
 
-1. **Vercel deployment protection** — `*.vercel.app` URLs require `vercel curl --deployment`; custom domains may also be protected. Check project settings.
+1. **Vercel deployment protection** — `*.vercel.app` URLs require the `x-vercel-protection-bypass` header (plain `curl`); custom domains may also be protected. Check project settings.
 2. **Next.js middleware / proxy** — add `pathname.startsWith("/api/your-endpoint")` to `isPublicPath()` (or equivalent guard function).
 3. **Route-level guards** — check the route handler itself for session/auth checks.
 
@@ -115,10 +125,9 @@ SECRET=$(grep MIGRATION_SECRET $MAIN_REPO/.env.local | cut -d= -f2 | tr -d '"')
 ## Check migration status
 
 ```bash
-vercel curl /api/admin/migrate \
-  --deployment <URL> \
-  --cwd $MAIN_REPO \
-  -- --header "x-migration-secret: $SECRET"
+curl -s "<URL>/api/admin/migrate" \
+  -H "x-vercel-protection-bypass: $BYPASS_SECRET" \
+  -H "x-migration-secret: $SECRET"
 ```
 
 Response includes `appliedMigrations` (already done) and `scripts` (full manifest). Diff them to find what's pending.
@@ -128,13 +137,11 @@ Response includes `appliedMigrations` (already done) and `scripts` (full manifes
 ## Apply a migration
 
 ```bash
-vercel curl /api/admin/migrate \
-  --deployment <URL> \
-  --cwd $MAIN_REPO \
-  -- --request POST \
-     --header "Content-Type: application/json" \
-     --header "x-migration-secret: $SECRET" \
-     --data '{"script":"NNN-name.sql"}'
+curl -s -X POST "<URL>/api/admin/migrate" \
+  -H "x-vercel-protection-bypass: $BYPASS_SECRET" \
+  -H "Content-Type: application/json" \
+  -H "x-migration-secret: $SECRET" \
+  -d '{"script":"NNN-name.sql"}'
 ```
 
 To apply multiple in sequence:
@@ -142,13 +149,11 @@ To apply multiple in sequence:
 ```bash
 for script in 009-rbac-slugs.sql 010-estate-role-presets.sql; do
   echo "=== $script ==="
-  vercel curl /api/admin/migrate \
-    --deployment <URL> \
-    --cwd $MAIN_REPO \
-    -- --request POST \
-       --header "Content-Type: application/json" \
-       --header "x-migration-secret: $SECRET" \
-       --data "{\"script\":\"$script\"}" 2>&1 | grep -o '"message":"[^"]*"'
+  curl -s -X POST "<URL>/api/admin/migrate" \
+    -H "x-vercel-protection-bypass: $BYPASS_SECRET" \
+    -H "Content-Type: application/json" \
+    -H "x-migration-secret: $SECRET" \
+    -d "{\"script\":\"$script\"}" 2>&1 | grep -o '"message":"[^"]*"'
 done
 ```
 
@@ -158,48 +163,14 @@ done
 
 ## Find a project from a domain
 
-If you know a `*.vercel.app` URL (or any custom domain) but not the project name, use `vercel inspect` to reverse-lookup the project:
-
-```bash
-vercel inspect https://your-alias.vercel.app
-```
-
-The output shows the **project name**, deployment ID, all aliases assigned to it, and the team scope. This works on any alias — including custom `v0-*` domains, branch aliases, and per-deploy hash URLs.
-
-```
-> Fetched deployment "v0-app-abc123-team.vercel.app" in your-vercel-team
-  name    v0-my-project-name
-  id      dpl_abc123...
-  Aliases
-    ╶ https://your-alias.vercel.app
-    ╶ https://v0-my-project-name.vercel.app
-```
-
-Use when: a stakeholder shares a URL and you need to find the project in the Vercel dashboard, or when an alias doesn't match the obvious project name.
+Use the Vercel MCP: look up the domain/alias (project domain tools) or `get_deployment` with the URL. The result shows project name, deployment ID, aliases and team. Works on custom domains, branch aliases, and hash URLs.
 
 ---
 
 ## Get the latest deployment URL
 
-```bash
-# Latest preview:
-vercel ls --cwd $MAIN_REPO 2>&1 | grep "Preview" | head -1 | awk '{print $3}'
+Use the MCP `list_deployments` for the project, filter by target (preview/production), take the newest READY one. The listed URL is the hash URL; for the production custom domain use `get_deployment` and read its aliases.
 
-# Latest production:
-vercel ls --cwd $MAIN_REPO 2>&1 | grep "Production" | head -1 | awk '{print $3}'
-```
-
-**IMPORTANT: The URL returned by `vercel ls` is the Vercel-generated hash URL (e.g., `project-abc123xyz-team.vercel.app`). To get the PRODUCTION CUSTOM DOMAIN, you MUST inspect the deployment:**
-
-```bash
-# Get production deployment URL
-PROD_URL=$(vercel ls --prod 2>&1 | grep "Production" | head -1 | awk '{print $3}')
-
-# Inspect to get custom domain aliases
-vercel inspect "$PROD_URL" 2>&1 | grep -A 10 "Aliases"
-```
-
-The `Aliases` section shows ALL URLs for this deployment, including custom domains like `my-app.example.com`. **Always report the custom domain to the user, not the hash URL.**
 
 ---
 
@@ -239,14 +210,7 @@ Options:
 
 On success, prints the stable **branch alias URL** (e.g. `https://v0-app-git-my-branch-team.vercel.app`) and writes it to `/tmp/vercel_prod_url.txt`. Falls back to the per-deploy hash URL if no alias is found.
 
-**"Auth error (stale token)" even though `vercel whoami`/`vercel ls` work fine:** the Vercel CLI uses
-short-lived OAuth access tokens (`~/Library/Application Support/com.vercel.cli/auth.json` — `token` +
-`refreshToken` + `expiresAt`). Any `vercel` CLI command transparently refreshes an expired/near-expired
-token and rewrites that file. `vercel-wait-deploy` now does the same: it checks `expiresAt` before
-polling and on every 401/403 mid-poll, forcing a refresh via `vercel whoami` and re-reading the file —
-so a stale cached token self-heals instead of failing the whole wait. If it still fails after that,
-the token itself is genuinely invalid and `vercel login` is required (this also breaks the CLI itself,
-so `vercel whoami` failing is the tell).
+**"Auth error (stale token)":** `vercel-wait-deploy` reads the token from `$VERCEL_TOKEN` if set, otherwise from the CLI's `auth.json` (and refreshes it via the CLI). Prefer a stored `VERCEL_TOKEN` so it never depends on the CLI.
 
 ---
 
@@ -262,19 +226,7 @@ so `vercel whoami` failing is the tell).
 
 ## Debug failed builds
 
-When a deployment fails, use `vercel inspect` with `--logs` to see the full build output including errors, test failures, and dependency issues:
-
-```bash
-# From GitHub PR checks or Vercel dashboard, get the deployment ID (starts with dpl_)
-# Then inspect with logs:
-npx vercel inspect dpl_<DEPLOYMENT_ID> --logs --scope <SCOPE_NAME>
-
-# Example:
-npx vercel inspect dpl_Aix3L5sBTVQMRt3qM9wKkEbtYLUD --logs --scope your-vercel-team
-
-# Pipe to tail for last N lines (error usually at the end):
-npx vercel inspect dpl_<ID> --logs --scope <SCOPE> 2>&1 | tail -100
-```
+When a deployment fails, get the deployment ID (`dpl_…`, from `list_deployments` or the PR check URL) and call the Vercel MCP `list_deployment_events` for the full build output (errors, test failures, dependency issues). Read the **last 50–100 lines** first.
 
 **What this shows:**
 - Full build stdout/stderr
@@ -284,19 +236,7 @@ npx vercel inspect dpl_<ID> --logs --scope <SCOPE> 2>&1 | tail -100
 - Environment variable issues
 - Exact line where build failed
 
-**Getting the deployment ID:**
-
-From GitHub PR:
-```bash
-gh pr checks <PR_NUMBER> | grep "Vercel.*fail"  # Shows failing check with URL
-# Extract dpl_* from the URL
-```
-
-From Vercel dashboard URL:
-```
-https://vercel.com/.../dpl_Aix3L5sBTVQMRt3qM9wKkEbtYLUD
-                        ^-- deployment ID starts here
-```
+**Getting the deployment ID:** `gh pr checks <PR_NUMBER> | grep Vercel` shows the failing check URL; the `dpl_*` segment is the ID. Or use `list_deployments`.
 
 **Troubleshooting tip:** Scroll to the end of the logs first — the error is usually in the last 50-100 lines. Look for:
 - `Error:` or `ERROR` lines
@@ -308,28 +248,7 @@ https://vercel.com/.../dpl_Aix3L5sBTVQMRt3qM9wKkEbtYLUD
 
 ## Historical logs
 
-```bash
-# Get deployment ID from URL
-vercel inspect <URL> | grep '^\s*id'  # → dpl_abc123
-
-# Pull runtime logs (after deployment is live)
-vercel logs dpl_abc123 --no-follow                    # all recent
-vercel logs dpl_abc123 --no-follow --status-code 500  # errors only
-vercel logs dpl_abc123 --no-follow --query "error"    # substring filter
-vercel logs dpl_abc123 --no-follow --json | jq '.message'
-```
-
-**Note:** `vercel logs` shows **runtime logs** (requests, function invocations). For **build logs**, use `vercel inspect --logs` (see "Debug failed builds" above).
-
-`--no-follow` is required — without it, `vercel logs` tails forever and blocks the shell.
-
-| Flag | Purpose |
-|---|---|
-| `--no-follow` | One-shot historical lookup |
-| `--status-code <N>` | Filter by HTTP status (`500`, `4xx`) |
-| `--query <str>` | Substring filter |
-| `--json` | Machine-readable; pipe to `jq` |
-| `--since <duration>` | e.g. `--since 1h` or `--since 2024-01-15` |
+Use the Vercel MCP: runtime logs for a deployment (requests, function invocations; filter by status code or search text), and `list_deployment_events` for **build** logs. Check the tool schema via ToolSearch for the filter params.
 
 ---
 
@@ -370,27 +289,17 @@ SECRET=$(op item get "MyProject MY_SECRET" --fields password)
 
 **Full new-secret workflow:**
 1. Generate + store in password manager (commands above)
-2. Push to Vercel production: `vercel env add MY_SECRET production --value "$SECRET" --yes --cwd $MAIN_REPO`
-3. Push to Vercel preview branch: `vercel env add MY_SECRET preview <branch> --value "$SECRET" --yes --cwd $MAIN_REPO`
-4. Write to `.env.local`: `grep -v '^MY_SECRET=' .env.local > /tmp/e && mv /tmp/e .env.local && echo 'MY_SECRET="'"$SECRET"'"' >> .env.local`
+2. Push to Vercel production: MCP `create_project_env` (key, value, target `production`)
+3. Push to Vercel preview: MCP `create_project_env` (target `preview`, optionally a `gitBranch`)
+4. Write to `.env.local` (or just run `vercel-env-pull`): `grep -v '^MY_SECRET=' .env.local > /tmp/e && mv /tmp/e .env.local && echo 'MY_SECRET="'"$SECRET"'"' >> .env.local`
 
-**Setting same value on production + preview:** CLI requires two calls — no "all environments" shorthand in non-interactive mode. For preview, a branch name is required with `--yes`; omit `--yes` to apply to all preview branches interactively. Add `--force` to overwrite existing values.
-
-**New env var not live until redeployed** — existing deployments don't pick up new env vars; `vercel redeploy <url> --cwd $MAIN_REPO` or push a new commit.
+**Same value on production + preview:** `create_project_env` accepts multiple targets; verify in the schema. **New env var not live until redeployed** — push a new commit or trigger a redeploy.
 
 ---
 
-## Adding env vars via CLI
+## Adding env vars: no trailing newline
 
-Use `printf '%s'` instead of `echo` to avoid a trailing newline being stored in the value — a newline in the value causes `403 Forbidden` errors at runtime:
-
-```bash
-# Correct — no trailing newline:
-printf '%s' "$MY_SECRET" | vercel env add MY_SECRET production
-
-# Wrong — echo appends \n which gets stored in the value:
-echo "$MY_SECRET" | vercel env add MY_SECRET production
-```
+A trailing newline in a stored value causes `403 Forbidden` at runtime. When passing the value to the MCP, ensure it has no trailing `\n` (trim it).
 
 ---
 
@@ -430,17 +339,6 @@ curl -s -X POST "https://your-project.vercel.app/api/your-endpoint" \
   -d '...'
 ```
 
-Or with `vercel curl`:
-
-```bash
-vercel curl /api/your-endpoint \
-  --deployment "https://your-project.vercel.app" \
-  --protection-bypass "$BYPASS_SECRET" \
-  -- --request POST \
-     --header "Content-Type: application/json" \
-     --data '...'
-```
-
 ### Store the bypass secret in Keeper
 
 ```bash
@@ -471,13 +369,11 @@ Your 32-char secret should appear as a key in the output.
 
 ## Common gotchas
 
-- **`vercel ls` output goes to stderr** — always use `2>&1`
-- **Env var trailing newline** — always use `printf '%s'` (not `echo`) when piping values to `vercel env add`; a stored newline causes `403 Forbidden` at runtime
-- **Preview deployments are behind Vercel SSO** — plain `curl` gets an HTML login page; always use `vercel curl --deployment` or the protection bypass header
+- **Env var trailing newline** — trim values before storing; a stored newline causes `403 Forbidden` at runtime
+- **Preview deployments are behind Vercel SSO** — plain `curl` gets an HTML login page; always use the protection bypass header (`x-vercel-protection-bypass`)
 - **Bypass secret ≠ env var** — setting `VERCEL_AUTOMATION_BYPASS_SECRET` as an env var does NOT enable the bypass; you must register it via the REST API (see "Deployment Protection Bypass" above)
 - **Bypass secret must be exactly 32 alphanumeric chars** — use `openssl rand -hex 16` (produces 32 hex chars); longer values will be rejected with a pattern error
 - **Migration errors don't block recording** — if a migration has `✗` lines, it's still marked applied; write a follow-up fix migration rather than re-running
 - **DSQL: no `ADD COLUMN NOT NULL DEFAULT`** — split into nullable `ADD COLUMN` + `UPDATE ... WHERE col IS NULL` backfill
-- **Worktree cwd** — always pass `--cwd $MAIN_REPO` when running Vercel CLI from a worktree
-- **`--level error` doesn't exist** — use `--status-code 500` or `--query "error"` instead
-- **Empty string from `vercel env pull` ≠ missing value** — env vars marked as `sensitive` (secret-level) return an empty string when pulled; an empty string does NOT mean the value is unset or blank in Vercel. Never assume the value needs to be re-entered based on `vercel env pull` output alone.
+- **Worktree cwd** — always pass `--cwd $MAIN_REPO` to `vercel-env-pull` / `vercel-wait-deploy` from a worktree
+- **Empty/skipped var from `vercel-env-pull` ≠ missing value** — env vars marked as `sensitive` (secret-level) come back empty (the script lists them as skipped); an empty string does NOT mean the value is unset or blank in Vercel. Never assume the value needs to be re-entered based on `vercel-env-pull` output alone.

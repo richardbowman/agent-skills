@@ -32,7 +32,7 @@ SECRET=$(grep EDITOR_AGENT_SECRET "${HIPTRIP_REPO:-$PWD}/.env.local" | cut -d= -
 SECRET=$(openssl rand -hex 32)
 echo "EDITOR_AGENT_SECRET=\"$SECRET\"" >> ~/projects/hip-trip-marketing-site/.env.local
 # Then add it to Vercel:
-vercel env add EDITOR_AGENT_SECRET --cwd ~/projects/hip-trip-marketing-site
+# Vercel MCP create_project_env: key EDITOR_AGENT_SECRET (hip-trip-marketing-site project)
 ```
 
 ---

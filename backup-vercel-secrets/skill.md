@@ -9,13 +9,13 @@ Pull production and preview env vars from Vercel and store them as 1Password ite
 
 ## Prerequisites
 
-- `vercel` CLI installed and authenticated (`vercel whoami`)
+- `VERCEL_TOKEN` set (or a signed-in CLI token); `vercel-env-pull` on PATH
 - `op` CLI installed and authenticated (`op account list`)
 - Must be run from inside a Vercel-linked project directory
 
 Check both are ready before proceeding:
 ```sh
-vercel whoami && op account list
+op account list
 ```
 
 ## Steps
@@ -37,11 +37,11 @@ Ask the user which vault (default: **Private**). Common choices: Private, Employ
 ### 3. Pull env vars from Vercel
 
 ```sh
-vercel env pull --environment=production --yes .env.prod.backup
-vercel env pull --environment=preview    --yes .env.preview.backup
+vercel-env-pull --environment production --yes --out .env.prod.backup
+vercel-env-pull --environment preview --yes --out .env.preview.backup
 ```
 
-Note: `vercel env pull` only pulls non-sensitive vars by default on newer CLI versions. If the output looks sparse, check `vercel env ls production` to see what's actually stored.
+Note: sensitive vars come back empty; `vercel-env-pull` lists their names as skipped. Use the Vercel MCP `filter_project_envs` to see what's actually stored.
 
 ### 4. Parse .env files into op field assignments
 
@@ -141,11 +141,11 @@ for f in data.get('fields', []):
 
 ## Troubleshooting
 
-- **`vercel env pull` returns empty file**: Make sure you're in a linked project (`vercel link`).
+- **`vercel-env-pull` returns empty file**: Make sure you're in a linked project (`.vercel/project.json` must exist).
 - **`op` auth error**: Run `op signin` to re-authenticate.
 - **`mapfile` not found**: `mapfile` requires bash 4+. macOS ships bash 3. Either install bash 5 (`brew install bash`) or use this fallback instead of `mapfile`:
   ```sh
   fields=()
   while IFS= read -r line; do fields+=("$line"); done < <(parse_env_for_op "$envfile")
   ```
-- **`vercel env pull` missing secrets**: Vercel only pulls non-sensitive vars. Sensitive vars (marked encrypted) must be re-entered manually. Check `vercel env ls production` to audit what was pulled vs. what exists.
+- **`vercel-env-pull` missing secrets**: Vercel only pulls non-sensitive vars. Sensitive vars (marked encrypted) must be re-entered manually. Use the script's skipped-names list and the Vercel MCP `filter_project_envs` to audit.

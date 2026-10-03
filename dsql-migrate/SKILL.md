@@ -129,31 +129,28 @@ git push
 
 After deployment finishes:
 
-> **Preview deployments are behind Vercel SSO protection.** Plain `curl` will return an HTML login page, not JSON. Use `vercel curl` which handles authentication automatically. Note the `--` separator — curl flags go after it.
+> **Preview deployments are behind Vercel SSO protection.** Plain `curl` returns an HTML login page, not JSON. Send the protection-bypass header (`x-vercel-protection-bypass: $BYPASS_SECRET`; see vercel-tools → "Deployment Protection Bypass").
 
-**Preview (use `vercel curl`):**
+**Preview:**
 ```sh
 SECRET="your-migration-secret"
-vercel curl /api/admin/migrate \
-  --deployment https://myapp-git-feature-branch.vercel.app \
-  -- --request POST \
-     --header "Content-Type: application/json" \
-     --header "x-migration-secret: $SECRET" \
-     --data '{"script":"002_add_priority"}'
+curl -s -X POST https://myapp-git-feature-branch.vercel.app/api/admin/migrate \
+  -H "x-vercel-protection-bypass: $BYPASS_SECRET" \
+  -H "Content-Type: application/json" \
+  -H "x-migration-secret: $SECRET" \
+  -d '{"script":"002_add_priority"}'
 ```
 
-**Production (also use `vercel curl` — per-deployment `*.vercel.app` URLs are behind Vercel auth too):**
+**Production (per-deployment `*.vercel.app` URLs are behind Vercel auth too):**
 ```sh
-vercel curl /api/admin/migrate \
-  --deployment https://myapp-abc123.vercel.app \
-  --cwd /path/to/main-repo \
-  -- --request POST \
-     --header "Content-Type: application/json" \
-     --header "x-migration-secret: $SECRET" \
-     --data '{"script":"002_add_priority"}'
+curl -s -X POST https://myapp-abc123.vercel.app/api/admin/migrate \
+  -H "x-vercel-protection-bypass: $BYPASS_SECRET" \
+  -H "Content-Type: application/json" \
+  -H "x-migration-secret: $SECRET" \
+  -d '{"script":"002_add_priority"}'
 ```
 
-> Only a custom domain (e.g. `myapp.com`) would be reachable via plain `curl`. All `*.vercel.app` URLs require `vercel curl`.
+> Only a custom domain (e.g. `myapp.com`) would be reachable via plain `curl`. All `*.vercel.app` URLs require the bypass header.
 
 **Response:**
 ```json
@@ -167,17 +164,16 @@ vercel curl /api/admin/migrate \
 
 **Preview:**
 ```sh
-vercel curl /api/admin/migrate \
-  --deployment https://myapp-git-feature-branch.vercel.app \
-  -- --header "x-migration-secret: $SECRET"
+curl -s https://myapp-git-feature-branch.vercel.app/api/admin/migrate \
+  -H "x-vercel-protection-bypass: $BYPASS_SECRET" \
+  -H "x-migration-secret: $SECRET"
 ```
 
 **Production:**
 ```sh
-vercel curl /api/admin/migrate \
-  --deployment https://myapp-abc123.vercel.app \
-  --cwd /path/to/main-repo \
-  -- --header "x-migration-secret: $SECRET"
+curl -s https://myapp-abc123.vercel.app/api/admin/migrate \
+  -H "x-vercel-protection-bypass: $BYPASS_SECRET" \
+  -H "x-migration-secret: $SECRET"
 ```
 
 To find the latest production deployment URL: `vercel list --cwd /path/to/main-repo` — it's the first result.
@@ -290,11 +286,11 @@ const stmt = process.env.DATABASE_URL
 
 **Fix:** Write the missing column as a migration (`ADD COLUMN IF NOT EXISTS`) and apply it via the API:
 ```sh
-vercel curl /api/admin/migrate --deployment <URL> \
-  -- --request POST \
-     --header "x-migration-secret: $SECRET" \
-     --header "Content-Type: application/json" \
-     --data '{"script":"NNN-add-missing-column.sql"}'
+curl -s -X POST <URL>/api/admin/migrate \
+  -H "x-vercel-protection-bypass: $BYPASS_SECRET" \
+  -H "x-migration-secret: $SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"script":"NNN-add-missing-column.sql"}'
 ```
 
 **Do NOT** apply DDL directly to the database. Direct changes bypass the migration tracker, create environment drift (preview has it, prod doesn't), and won't be reproducible. Always create a migration file and run it through the API.
@@ -402,4 +398,4 @@ Many projects maintain both an authoritative full schema (e.g. `001-full-schema.
 - [ ] `getActiveSchema()` returns the expected schema name
 - [ ] `INDEX ASYNC` stripping in migration runner is gated on `DATABASE_URL` being set, not unconditional
 - [ ] If migration runner has both an inline loop and a helper function, both have the same SQL transformation logic
-- [ ] Using `vercel curl --deployment <URL>` for protected preview environments, not plain `curl`
+- [ ] Sending the `x-vercel-protection-bypass` header for protected preview environments

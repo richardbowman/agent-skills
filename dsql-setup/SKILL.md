@@ -344,14 +344,13 @@ export async function POST(req: Request) {
    Or in the Vercel dashboard: Project Settings → Security → OIDC Token Federation → Enable.
 4. **(Optional) Set `PGSCHEMA`** in Vercel environment variables to a custom prefix (e.g. `myapp`). If not set, defaults to `app`.
 5. **Deploy to Vercel** — environment variables are injected automatically
-6. **Run migrations** — use `vercel curl` (not plain `curl`) since `*.vercel.app` URLs are behind Vercel deployment protection:
+6. **Run migrations** — send the `x-vercel-protection-bypass` header since `*.vercel.app` URLs are behind Vercel deployment protection:
    ```bash
-   vercel curl /api/admin/migrate \
-     --deployment https://your-app-abc123.vercel.app \
-     -- --request POST \
-        --header "Content-Type: application/json" \
-        --header "x-migration-secret: $SECRET" \
-        --data '{"name":"001_init"}'
+   curl -s -X POST https://your-app-abc123.vercel.app/api/admin/migrate \
+     -H "x-vercel-protection-bypass: $BYPASS_SECRET" \
+     -H "Content-Type: application/json" \
+     -H "x-migration-secret: $SECRET" \
+     -d '{"name":"001_init"}'
    ```
 
 ## Critical constraints

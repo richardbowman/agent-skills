@@ -16,7 +16,7 @@ The `worktree-bootstrap` command and bootstrap/cleanup workflow are harness-neut
 Fresh git worktrees miss several pieces the main checkout has:
 
 - **No `node_modules`** — worktrees share git objects but not dependencies.
-- **No `.env.local`** — `vercel env pull` only runs against a linked project, and `.vercel/project.json` lives in the main checkout, not the worktree. Note that copying the main checkout's file does not guarantee the secrets are there; see "Verify the copied secrets" below.
+- **No `.env.local`** — `vercel-env-pull` only runs against a linked project, and `.vercel/project.json` lives in the main checkout, not the worktree. Note that copying the main checkout's file does not guarantee the secrets are there; see "Verify the copied secrets" below.
 - **DSQL credentials won't work locally** — if the project uses AWS Aurora DSQL via the Vercel integration, auth requires a live OIDC token exchange that only runs server-side on Vercel. Locally the SDK times out or throws `UnauthorizedException`.
 - **Node may be the wrong version** — the machine default is often newer than the repo's `engines.node` pin, which fails the install outright.
 
@@ -48,7 +48,7 @@ One command, idempotent. Re-running is safe — install and .env.local copy both
 **The copy is wholesale and unvalidated.** `worktree-bootstrap` does
 `fs.copyFileSync(mainRepo/.env.local, worktree/.env.local)` and then injects
 `DATABASE_URL`. It never checks what was in the source file. If the main
-checkout's `.env.local` is thin — and it often is, because `vercel env pull`
+checkout's `.env.local` is thin — and it often is, because `vercel-env-pull`
 can leave behind little more than a `VERCEL_OIDC_TOKEN` — the worktree inherits
 a file that looks populated (it has a `DATABASE_URL` now) but is missing the
 auth secrets entirely.
@@ -107,8 +107,8 @@ echo "AUTH_SECRET=$(openssl rand -base64 32)" >> .env.local
 > **Never reuse a locally generated `AUTH_SECRET` in a deployed environment.**
 > A dev value that has sat in a worktree, a shell history, or a log is
 > compromised by definition. Deployed environments get their own secret, set
-> through the platform's env-var UI/CLI (e.g. `vercel env add AUTH_SECRET
-> production --sensitive`), and each environment gets a distinct one.
+> through the platform's env-var UI or the Vercel MCP `create_project_env` (e.g. for AUTH_SECRET
+> in production, marked sensitive), and each environment gets a distinct one.
 >
 > Changing `AUTH_SECRET` invalidates every existing session signed with the old
 > value — expected locally, disruptive in production.

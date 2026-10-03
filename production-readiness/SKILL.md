@@ -122,7 +122,7 @@ After Vercel builds the preview:
 
 ```sh
 # Wait for the preview to be ready
-vercel ls --cwd /path/to/main-repo   # or check Vercel dashboard
+# Use the Vercel MCP list_deployments (or the dashboard)
 ```
 
 Walk through the test plan in the PR description manually on the preview URL. At minimum:

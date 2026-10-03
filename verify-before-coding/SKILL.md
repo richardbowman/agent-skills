@@ -27,7 +27,7 @@ If I'm about to write code or a shell command that uses any of:
 …then I must do ONE of the following **before writing the line**:
 
 1. Open the official docs page with the harness's web retrieval capability. Session hooks may inject an exact URL—use it.
-2. Run `<tool> --help` or `<tool> <subcommand> --help` and quote from the output. For Vercel: `vercel <cmd> --help` is authoritative.
+2. Run `<tool> --help` or `<tool> <subcommand> --help` and quote from the output. For Vercel: use the Vercel MCP tool schemas (ToolSearch) and the REST API docs.
 3. Grep `package.json` / lockfile / `node_modules/<pkg>/package.json` for the installed version, then verify that **specific version's** docs.
 4. Read the installed source: `node_modules/<pkg>/dist/*.d.ts` for type signatures is ground truth.
 5. Write a 3-line test harness that imports the symbol and calls it — if it fails to import, my memory was wrong.
@@ -39,14 +39,12 @@ If I'm about to write code or a shell command that uses any of:
 - **State it openly** — "I think it's `--X` but I haven't verified; want me to check?" Let the user decide if verification is worth the wait.
 - **Verify before writing** — take the 10 seconds to run `--help`.
 
-What's **not** allowed: writing `vercel logs --level error` confidently and shipping it. That exact failure is what this skill exists to prevent.
+What's **not** allowed: writing a CLI flag or MCP parameter from memory confidently and shipping it. That exact failure is what this skill exists to prevent.
 
 ## Concrete failure modes from past sessions
 
 | What I wrote | What was actually true |
 |---|---|
-| `vercel logs --level error` | No such flag. Use `--status-code 500` or `--query "error"`. Only valid with `--follow`. |
-| `vercel logs --output raw` | Not a real value. Use `--json`. |
 | Using `Monitor` to one-shot historical logs | Wrong tool. Use `--no-follow` for history. |
 | `middleware.ts` in Next.js 16 | Renamed to `proxy.ts`. |
 | `unstable_cache` in a new Next.js 16 file | Use Cache Components (`use cache`, `cacheLife`, `cacheTag`). |

@@ -326,7 +326,7 @@ npx dotenv-cli -e .env.e2e -- npx playwright test --grep "some test name" --repo
 ```
 
 **Keeping `.env.e2e` in sync:** it is gitignored and does not track `.env.local`.
-After a `vercel env pull`, its `AUTH_SECRET` / `ENCRYPTION_KEY` can go stale and
+After a `vercel-env-pull`, its `AUTH_SECRET` / `ENCRYPTION_KEY` can go stale and
 tests start failing with auth errors. Regenerate it with the commands above.
 
 ---
