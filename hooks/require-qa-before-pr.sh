@@ -42,6 +42,12 @@ done
 BRANCH=$(git -C "$CWD" branch --show-current)
 [ -n "$HEAD_ARG" ] && BRANCH="${HEAD_ARG#*:}"
 VAULT="${VAULT_ROOT:-$HOME/Library/Mobile Documents/com~apple~CloudDocs/Documents/Personal}"
+# The vault moved out of iCloud to ~/Documents/Personal. When VAULT_ROOT is unset and the old
+# default has no Products/ folder, use the current location. The gate itself is unchanged:
+# the QA-GATE: PASS line must still be present in a run note modified in the last 24h.
+if [ -z "${VAULT_ROOT:-}" ] && [ ! -d "$VAULT/Products" ] && [ -d "$HOME/Documents/Personal/Products" ]; then
+  VAULT="$HOME/Documents/Personal"
+fi
 
 IS_COMPASS=0
 grep -qsi 'compass' "$ROOT/pm-config.md" && IS_COMPASS=1
