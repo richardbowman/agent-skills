@@ -35,7 +35,12 @@ for f in CLAUDE.md AGENTS.md; do
 done
 BRANCH=$(git -C "$CWD" branch --show-current)
 [ -n "$HEAD_ARG" ] && BRANCH="${HEAD_ARG#*:}"
-VAULT="${VAULT_ROOT:-$HOME/Library/Mobile Documents/com~apple~CloudDocs/Documents/Personal}"
+VAULT="${VAULT_ROOT:-}"
+if [ -z "$VAULT" ]; then
+  for cand in "$HOME/Documents/Personal" "$HOME/Library/Mobile Documents/com~apple~CloudDocs/Documents/Personal"; do
+    [ -d "$cand/Products" ] && { VAULT="$cand"; break; }
+  done
+fi
 
 if find "$VAULT/Products" -path '*/Runs/*.md' -mtime -1 -print0 2>/dev/null \
    | xargs -0 grep -lsF "QA-GATE: PASS branch=$BRANCH" 2>/dev/null | grep -q .; then
