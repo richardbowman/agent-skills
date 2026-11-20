@@ -28,7 +28,7 @@ Use the active harness's shell, file, test, browser, and image-inspection capabi
 A feature is NOT done until every item below passes. Do not open a PR, push to
 main, or mark a Linear issue In Review until this checklist is complete. Once
 the checks finish, publish their QA summary in the GitHub PR as described in
-Step 7; the detailed vault report remains the durable evidence record.
+Step 7; the detailed report (a Compass Doc on Compass projects, a vault note otherwise) remains the durable evidence record.
 
 ## Step 0 — Load Per-Repo Guidelines
 
@@ -210,98 +210,92 @@ with a known visual bug and plan to fix it "later."
 chat.** Chat summaries are invisible to the user when this skill runs inside
 a background subagent; a written report is the only durable record.
 
+**Where the report goes depends on the project. Decide first:**
+the project uses Compass if `pm-config.md` (repo root, or `Products/<Project>/pm-config.md`
+in the vault) has a `## Provider Connections → Compass` section. If it does, **Compass is the
+primary record** (path A) and the vault is a fallback. If not, use the vault only (path B).
+
+### Path A — Compass project (primary)
+
+1. **Resolve the workspace** from that section (`Org slug`, `Workspace slug`, `Workspace ID`).
+   Geode sessions already have the native `mcp__compass__*` tools authenticated; elsewhere use
+   the credential the section names.
+2. **Find or create the Compass Task this PR delivers** (`list_tasks` for the branch/PR/topic;
+   else `create_task`, status `IN_REVIEW`, with the PR link once it exists). Link it to its
+   Solution or Roadmap Item with `link_task` when one fits; if an approved standalone delivery
+   Task already exists use it rather than duplicating; if nothing fits, say so in the report
+   rather than inventing an association. Every PR on a Compass project needs a Task: the gate checks for it.
+3. **Write the QA report as a Compass Doc**, kind `QA_REPORT`:
+   ```
+   write_doc(workspaceId,
+     path: "QA Reports/<YYYY-MM-DD> <feature or PR title>",
+     kind: "QA_REPORT",
+     content: <markdown: heading "## QA Report — <HH:MM>"; per viewport/mode pass/fail against
+               the four bullets above; commands run with their REAL pass/fail counts and the
+               machine they ran on; screenshots taken; a "NOT VERIFIED" list; PR and preview
+               links; if screenshots are in the vault, their vault-relative paths>)
+   ```
+   Record only OBSERVED output. Mark anything unverified as NOT VERIFIED. Get the doc's id and
+   url from `list_docs(kind: "QA_REPORT")`.
+4. **Link it to the Task:** `link_task(taskId, linkedType: "DOC", linkedId: docId)`, and post
+   `add_comment(targetType: "TASK", targetId: taskId, authorName: "Claude Code", body: "QA
+   Report: <doc url> — PASS|FAIL")`. If a Solution is known, also comment on it
+   (`add_solution_comment`).
+5. **Publish screenshot evidence inside the Compass Doc** (Compass Docs support
+   workspace-private image hosting): use the Compass skill's image-upload workflow
+   (`prepare_doc_image_upload`, private upload, returned Markdown) and embed the actual
+   screenshots, not a pointer to the vault. Inspect the images for secrets and unrelated private
+   data first. Label each capture or group with commit/version, capture date, environment
+   (local/preview/production), viewport and state. Never publish upload tokens or use public
+   hosting to bypass workspace access controls.
+   **Verify delivery:** read the saved Doc back, then open it as an authorized workspace reader
+   and confirm every embedded screenshot renders. A successful upload response or saved Markdown
+   alone is not display verification. If upload or display checking is blocked, mark
+   **screenshot publication incomplete** with the reason, separately from passing tests; local
+   evidence does not clear hosted verification gates. Keep the originals in the vault under
+   `Attachments/QA/<Project>/<YYYY-MM-DD>-<slug>/` as an archive and link any vault file you
+   create from today's `Daily/YYYY-MM-DD.md` under `## Claude Sessions`. Do not use a vault
+   path as the Doc's evidence link.
+6. **Write the gate receipt** (only when the checks actually passed). Directory
+   `~/.claude/qa-gates/` (create it if missing), file name = branch with each `/` and space
+   replaced by `__`, plus `.gate`; one line:
+   ```
+   QA-GATE: PASS branch=<branch> task=TASK-<n> report=<Compass doc URL>
+   ```
+   The PR-create hook requires `task=` and `report=`, the right branch, and a file touched in the
+   last 24h.
+7. **Compass unavailable?** Only if the Compass tools return real errors (not merely slow):
+   write the report to the vault run note `Products/<Project>/Runs/<slug>-<YYYY-MM-DD>-<topic>.md`
+   with a `## QA Report — <HH:MM>` section, then add these two lines to it:
+   ```
+   QA-GATE: PASS branch=<branch>
+   COMPASS-UNAVAILABLE: <the actual error text>
+   ```
+   and back-fill the Compass Doc and Task link once Compass returns (then write the receipt).
+
+### Path B — project without Compass (vault only)
+
 1. Find or create today's per-run vault note:
-   `Products/<Project>/Runs/<project-slug>-<YYYY-MM-DD>-*.md` (vault-relative)
-   (project name from the repo directory/`package.json`, capitalized —
-   e.g. `compass` → `Compass`). Append to today's note if one exists (most
-   recently modified if several); otherwise create
-   `...-<YYYY-MM-DD>-qa.md`.
-2. Append a `## QA Report — <HH:MM>` section listing, per viewport/mode
-   checked: pass/fail against the four bullets above, and what was actually
-   different if something failed and got fixed.
-3. **Embed real screenshots, not descriptions.** Save each one under
-   `Attachments/QA/<Project>/<YYYY-MM-DD>-<slug>/` (vault-relative) and
-   embed it in the report with `![[Attachments/QA/<Project>/.../file.png]]`.
-   "Verified visually" with no attached image does not satisfy this step.
-4. Keep vault QA notes in the vault. Publish repository-owned documentation through
-   the repository's normal Git commit, push, and PR workflow.
-5. When you report completion of this checklist (to the user or to whoever
-   spawned you as a subagent), state the exact vault path of the report you
-   wrote. A local archive path is not accessible evidence for shared-report readers.
-6. **If this project uses Compass for product management, also publish the
-   report as a Compass Doc and link it to the Solution or Roadmap Item it
-   verifies.** Do this *in addition to* the vault note above, never instead of
-   it. Compass Docs support workspace-private image hosting: upload and embed
-   the actual screenshots, not a pointer to the vault report. Resolve routing
-   from the project's configuration; the vault copy remains an archive.
+   `Products/<Project>/Runs/<project-slug>-<YYYY-MM-DD>-*.md` (vault-relative; project name
+   from the repo directory/`package.json`, capitalized). Append to today's note if one exists
+   (most recently modified if several); otherwise create `...-<YYYY-MM-DD>-qa.md`.
+2. Append a `## QA Report — <HH:MM>` section listing, per viewport/mode checked: pass/fail
+   against the four bullets above, and what was actually different if something failed and got
+   fixed.
+3. **Embed real screenshots, not descriptions.** Save each under
+   `Attachments/QA/<Project>/<YYYY-MM-DD>-<slug>/` and embed with
+   `![[Attachments/QA/<Project>/.../file.png]]`.
+4. Add the line `QA-GATE: PASS branch=<branch>` to that note once everything passed, and link it
+   from today's Daily note.
 
-   **Check whether this applies:** look for
-   `Products/<Project>/pm-config.md` (same `<Project>`
-   resolved in step 1). If it doesn't exist, or it has no `## Provider
-   Connections → Compass` section, skip the rest of this item — the vault
-   report is the complete record for this project.
+### Both paths
 
-   **Resolve the org/workspace:** read `Org slug`, `Workspace slug`, and
-   `Workspace ID` from that Compass section. Get the MCP API key from the
-   location it names (env var or 1Password), same as the `compass-workflow`
-   skill.
-
-   **Resolve what this PR delivers against.** If a `compass-workflow` session
-   already set a Solution to `IN_DELIVERY` for this branch, use that
-   `solutionId`. Otherwise ask the user which Solution or Roadmap Item this PR
-   closes out — do not guess it from the branch name or commit messages. If
-   an approved standalone delivery Task already exists, link the Doc to that
-   Task instead; do not invent a Solution/Roadmap association or duplicate Task.
-
-   **Publish screenshot evidence:** use the Compass skill's Docs image-upload
-   workflow (`prepare_doc_image_upload`, private upload, returned Markdown).
-   Inspect the images for secrets and unrelated private data before upload.
-   Label each capture/group with commit/version, capture date, environment
-   (local/preview/production), viewport and relevant state. Never publish upload
-   tokens or use public hosting to bypass workspace access controls.
-
-   **Create the doc:**
-   ```
-   create_doc(workspaceId,
-     title: "QA Report — <feature/PR title> — <YYYY-MM-DD HH:MM>",
-     content: <markdown — the same pass/fail table used in Step 7, plus
-               captioned screenshots using returned Compass image URLs>,
-     parentId: <id of a "QA Reports" doc — find it via list_docs; if it
-                doesn't exist yet, create it once as a root doc and reuse it
-                for every future report>)
-   ```
-
-   **Link it to the work it verifies:**
-   - **Delivery Task known:** `link_task(taskId, linkedType: "DOC", linkedId: docId)`.
-   - **Solution known:** Compass Docs have no generic solution-link field
-     (that's reserved 1:1 for GTM Positioning Briefs), so link it by posting
-     to the Solution's Plan & Discussion thread instead:
-     `add_solution_comment(solutionId, body: "QA Report: <Compass doc URL> —
-     <PASS|FAIL>", authorName: "Claude Code")`.
-   - **Only a Roadmap Item is known, and it has no linked Solution** (check
-     `list_roadmap_items` — most do, since `promote_to_roadmap` sets one):
-     bridge the gap with a task, since Roadmap Items and Docs have no direct
-     link tool between them:
-     ```
-     create_task(workspaceId, title: "QA verification: <roadmap item title>")  → taskId
-     link_task(taskId, linkedType: "ROADMAP_ITEM", linkedId: roadmapItemId)
-     link_task(taskId, linkedType: "DOC", linkedId: docId)
-     ```
-
-   **Verify delivery:** read the saved Doc back, then open it as an authorized
-   workspace reader and confirm every embedded screenshot renders. A successful
-   upload response or saved Markdown alone is not display verification. Preserve
-   unrelated report content when updating an existing Doc. If upload or display
-   checking is blocked, mark **screenshot publication incomplete** with the
-   reason, separately from passing tests. Local evidence does not clear hosted
-   verification gates.
-
-   Add the Compass Doc URL to the vault archive. Do not use a vault path as the
-   shared Doc's evidence link; its screenshots must be viewable within Compass.
-
-   State the Compass doc URL and what it's linked to (Solution comment or
-   linking Task) alongside the vault path when reporting completion — same
-   durability rule as the vault path.
+- Chat summaries are invisible when this skill runs inside a background subagent; the written
+  report is the only durable record. Publish repository-owned documentation through the
+  repository's normal Git commit, push, and PR workflow, not through the vault.
+- When you report completion (to the user or to whoever spawned you), state the Compass Doc URL
+  and Task id (Path A) or the exact vault path (Path B or fallback). That is the proof the
+  verification happened.
 
 ## Step 5 — Docs Review
 
@@ -356,7 +350,7 @@ existing report instead of appending duplicates:
 
 **Known gaps:** None.
 
-**Detailed evidence:** `<vault-relative-or-absolute-path>`
+**Detailed evidence:** `<compass-doc-url, or vault path when Compass was unavailable or the project has none>`
 **Compass doc:** `<url, or "N/A — project not Compass-managed">`
 <!-- qa-report:end -->
 ```
@@ -388,13 +382,11 @@ status for each item:
 - [ ] Unit tests: passing + new tests written
 - [ ] E2E tests: passing + new/updated tests written
 - [ ] Visual verification: desktop and mobile viewports checked (if UI touched)
-- [ ] QA report written to the vault run note with embedded screenshots (if
-      any tests were run or visual verification was performed) — state the
-      path
-- [ ] QA report published as a Compass Doc and linked to the relevant
-      delivery Task, Solution (or Roadmap Item via a linking Task), with
-      required images uploaded, environment-labeled and display-verified — if the project has
-      `pm-config.md` with a Compass connection; otherwise N/A
+- [ ] QA report written (if any tests were run or visual verification was performed):
+      Compass projects: Compass Doc (kind QA_REPORT) linked to the Compass Task, gate receipt
+      written, state doc URL + task id; vault fallback only if Compass errored
+      (`COMPASS-UNAVAILABLE` line). Other projects: vault run note with embedded screenshots,
+      state the path
 - [ ] GitHub PR body contains the current marked QA report, or the marked block
       is ready for an authorized PR-creation step
 - [ ] Docs: reviewed and updated for any changed user-facing behavior
