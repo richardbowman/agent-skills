@@ -74,7 +74,8 @@ Required first (non-prototype repo):
   2. Local dev server (or dev-builder) + the 'qa' subagent drives the UI; desktop 1280x800 AND mobile 390x844 screenshots, viewed.
   3. New user-facing flow => functional E2E spec added and passing.
   4. Compass: a Compass Task exists for this work (create or find it), the QA report is posted as a Compass Doc
-     and linked to that Task (pr-checklist Step 4). Screenshots stay in the vault: Attachments/QA/<Project>/.
+     with its screenshots uploaded to the Doc and display-verified, and linked to that Task
+     (pr-checklist Step 4). Keep the originals in the vault: Attachments/QA/<Project>/.
   5. Write the receipt  $HOME/.claude/qa-gates/$(printf '%s' "$BRANCH" | sed 's#[/ ]#__#g').gate  with one line:
        QA-GATE: PASS branch=$BRANCH task=TASK-<n> report=<Compass doc URL>
   If Compass is unreachable (tool errors, not just slow), write the report to the vault instead
