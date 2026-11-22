@@ -42,6 +42,12 @@ done
 BRANCH=$(git -C "$CWD" branch --show-current)
 [ -n "$HEAD_ARG" ] && BRANCH="${HEAD_ARG#*:}"
 VAULT="${VAULT_ROOT:-$HOME/Library/Mobile Documents/com~apple~CloudDocs/Documents/Personal}"
+# The vault moved out of iCloud to ~/Documents/Personal. When VAULT_ROOT is unset and the old
+# default has no Products/ folder, use the current location. The gate itself is unchanged:
+# the QA-GATE: PASS line must still be present in a run note modified in the last 24h.
+if [ -z "${VAULT_ROOT:-}" ] && [ ! -d "$VAULT/Products" ] && [ -d "$HOME/Documents/Personal/Products" ]; then
+  VAULT="$HOME/Documents/Personal"
+fi
 
 IS_COMPASS=0
 grep -qsi 'compass' "$ROOT/pm-config.md" && IS_COMPASS=1
@@ -69,6 +75,9 @@ fi
 if [ "$IS_COMPASS" = 1 ]; then
 cat >&2 <<MSG
 BLOCKED: no QA on record for branch '$BRANCH' (Compass project). Do not open the PR yet.
+THIS IS A TO-DO LIST, NOT A QUESTION. There is no waiver. Do NOT ask the user whether to run
+QA or "waive the gate" — just run every step below to completion, then retry. (Rick wants
+zero late interruptions; any real questions belonged in the first turn.)
 Required first (non-prototype repo):
   1. pr-checklist skill passes (tsc, full tests, build, docs, migration through the runner).
   2. Local dev server (or dev-builder) + the 'qa' subagent drives the UI; desktop 1280x800 AND mobile 390x844 screenshots, viewed.
@@ -88,6 +97,9 @@ MSG
 else
 cat >&2 <<MSG
 BLOCKED: no QA on record for branch '$BRANCH'. Do not open the PR yet.
+THIS IS A TO-DO LIST, NOT A QUESTION. There is no waiver. Do NOT ask the user whether to run
+QA or "waive the gate" — just run every step below to completion, then retry. (Rick wants
+zero late interruptions; any real questions belonged in the first turn.)
 Required first (non-prototype repo):
   1. pr-checklist skill passes (tsc, full tests, build, docs, migration through the runner).
   2. Local dev server + the 'qa' subagent drives the UI; desktop 1280x800 AND mobile 390x844 screenshots, viewed.

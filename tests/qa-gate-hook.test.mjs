@@ -90,3 +90,24 @@ test("pr-checklist documents the Compass receipt and the vault fallback in the h
   assert.match(skill, /COMPASS-UNAVAILABLE: <the actual error text>/);
   assert.match(skill, /kind: "QA_REPORT"/);
 });
+
+test("blocking message says it is a to-do list with no waiver, for both repo kinds", () => {
+  for (const compass of [true, false]) {
+    const e = setup({compass});
+    const r = run(e, e.repo);
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /TO-DO LIST, NOT A QUESTION/);
+    assert.match(r.stderr, /no waiver/i);
+  }
+});
+
+test("falls back to ~/Documents/Personal when the default iCloud vault path is missing", () => {
+  const e = setup({compass: false});
+  const home = mkdtempSync(join(tmpdir(), "home-"));
+  mkdirSync(join(home, "Documents/Personal/Products/Demo/Runs"), {recursive: true});
+  writeFileSync(join(home, "Documents/Personal/Products/Demo/Runs/n.md"), `QA-GATE: PASS branch=${BRANCH}\n`);
+  const input = JSON.stringify({tool_input: {command: "gh pr create --title x"}, cwd: e.repo});
+  const env = {...process.env, HOME: home, QA_GATE_DIR: e.gates};
+  delete env.VAULT_ROOT;
+  assert.equal(spawnSync("bash", [HOOK], {input, env, encoding: "utf8"}).status, 0);
+});
